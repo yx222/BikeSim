@@ -1,1 +1,1 @@
-# BikeSim -- MTB simulation
+# BikeSim -- MTB geometry and dyanmics simulation
