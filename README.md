@@ -9,4 +9,5 @@
         * pro: well integrated, lots of functionality for optimal control, ode, optimization, etc
         * con: not very flexible, syntax is counter-intuitive
     * [PyTorch](https://pytorch.org) 
-    
+ 
+ * Most likely candidate solution: [Autograd](https://github.com/HIPS/autograd) + [cyipopt](https://github.com/matthias-k/cyipopt)  
