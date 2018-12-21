@@ -264,16 +264,32 @@ def main():
 
     # animation ================================
     from matplotlib import animation
-    fig = plt.figure(3, figsize=(16, 8))
 
-    ax = plt.axes(xlim=(-1, 2), ylim=(-0.5, 1))
+
+    im = plt.imread('img/geometry.png')
+    im_height, im_width, _ = im.shape
+    x_bb_im = 745.0
+    z_bb_im = im_height - 1115.0
+    # work out the extent of the image
+    buffer = 0.4
+    scale_im = 0.425/(745.0 - 81.5)
+    x_min = (-x_bb_im)*scale_im
+    x_max = (im_width - x_bb_im)*scale_im
+    z_min = (-z_bb_im)*scale_im
+    z_max = (im_height - z_bb_im)*scale_im
+
+    # fig = plt.figure(3, figsize=(im_width/50, im_height/50))
+    fig = plt.figure()
+    ax = plt.axes(xlim=(x_min-buffer, x_max+buffer), ylim=(z_min-buffer, z_max+buffer))
     plt.title('5010 rear kinematics')
     # plt.axis('equal')
 
-    frame_width = 6
+    ax.imshow(im, extent=[x_min, x_max, z_min, z_max])
+
+    frame_width = 2
     frame_color = 'purple'
-    rim_width = 4
-    link_width = 4
+    rim_width = 2
+    link_width = 2
     main_frame = ax.plot([],[], 'k', linewidth=frame_width, color=frame_color)[0]
     triangle1 = ax.plot([], [], 'b', linewidth=frame_width, color=frame_color)[0]
     triangle2 = ax.plot([], [], 'b', linewidth=link_width, color='black')[0]
@@ -296,7 +312,7 @@ def main():
     plt.xlabel("x [m]")
     plt.ylabel("y [m]")
 
-    plt.legend()
+    # plt.legend()
 
     def init():
         [init_one(ha) for ha in ha_list]
