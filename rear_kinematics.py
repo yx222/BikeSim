@@ -21,10 +21,21 @@ class kinematics(object):
         self.l_rocker_triangle = 0.0878
         self.l_rocker_middle = 0.0323
 
-        self.l_triangle_hor = 0.4066
+        self.l_triangle_hor = 0.3788
         self.l_triangle_vert = 0.2402
         self.l_triangle_diag = 0.4943
         self.l_lower_link = 0.097
+
+        # frame data for drawing
+        self.p_fa = self.p_bb
+        self.p_fb = np.add(self.p_bb, [0.0739, 0])
+        self.p_fc = np.add(self.p_bb, [0.4805, 0.5313])
+        self.p_fd = np.add(self.p_fc, [-0.01386, 0.0369])
+        self.p_fe = np.add(self.p_bb, [-0.05544, 0.3003])
+        self.p_ff = np.add(self.p_bb, [-0.097, 0.4158])
+
+        self.p_front_wheel_centre = np.add(self.p_bb, [0.72996 + 0.0515*np.sin(66.5/180*np.pi), 0.0515*np.cos(66.5/180*np.pi)])
+
 
         self.idx = {'ax': 0, # RA
                     'az': 1,
@@ -45,7 +56,7 @@ class kinematics(object):
         #
         # The callback for calculating the objective
         #
-        return 0*np.dot(x, x)
+        return 0.0
 
     def gradient(self, x):
         #
@@ -72,6 +83,8 @@ class kinematics(object):
         con6 = dist_con(p_a, p_b, self.l_triangle_hor)
         con7 = dist_con(p_a, p_c, self.l_triangle_diag)
         con8 = dist_con(p_b, p_c, self.l_triangle_vert)
+
+        # this constraint is required to ensure that we find the correct solution (there are multiple feasible points)
         con9 = p_c[0] - p_d[0]
 
         return np.array((con1, con2, con3, con4, con5, con6, con7, con8, con9))
@@ -137,7 +150,7 @@ class kinematics(object):
         print("Objective value at iteration #%d is - %g" % (iter_count, obj_value))
 
 
-def solve(l_damper):
+def solve(l_damper, x0):
     #
     # Define the problem
     #
@@ -145,7 +158,6 @@ def solve(l_damper):
 
     n_dec = 9
     n_con = 9
-    x0 = np.zeros(n_dec)
 
     lb = -np.ones(n_dec)
     ub = np.ones(n_dec)
@@ -177,6 +189,7 @@ def solve(l_damper):
     #nlp.addOption('derivative_test', 'second-order')
     nlp.addOption('mu_strategy', 'adaptive')
     nlp.addOption('tol', 1e-7)
+    nlp.addOption('print_level', 0)
 
     #
     # Scale the problem (Just for demonstration purposes)
@@ -202,102 +215,121 @@ def solve(l_damper):
 
 def main():
     import matplotlib.pyplot as plt
-    n_point = 51
+    n_point = 20
     damper_eye2eye = 0.21
     damper_stroke = 0.05
     damper_travel = np.linspace(0, damper_stroke, n_point)
     l_damper = damper_eye2eye - damper_travel
 
     nlprob = kinematics()
-    _, x = zip(*[solve(l) for l in l_damper])
-    idx = nlprob.idx
+    #FIXME: silly hardcode
+    n_dec = 9
+    x = np.zeros((n_point, n_dec))
+
+    # we don't use list comprehension because we want to warm start
+    sol = np.zeros(n_dec)
+    for ii in range(l_damper.size):
+        idx, sol = solve(l_damper[ii], sol)
+        print("damper length {0}: RA height {1} \n".format(l_damper[ii], sol[idx["az"]]))
+        x[ii, :] = sol
 
     x = np.array(x)
 
+    print(x[0, idx['az']])
+
     # Draw the bicycle kinematics
-
-
-
-    plt.figure(2)
+    # reassign data
     z_ra = x[:, idx['az']]
-    # plt.plot(damper_travel, z_ra - z_ra[0])
-    motion_ratio = np.diff(z_ra)/np.diff(damper_travel)
-    plt.plot(z_ra[0:-1] - z_ra[0], motion_ratio)
-    plt.xlabel("wheel vertical travel [m]")
-    plt.ylabel("motion ratio [-]")
+    p_d = x[:, [idx['dx'], idx['dz']]]
+    p_c = x[:, [idx['cx'], idx['cz']]]
+    p_b = x[:, [idx['bx'], idx['bz']]]
+    p_a = x[:, [idx['ax'], idx['az']]]
+    p_rocker_pivot = np.array([nlprob.p_rocker_pivot for _ in range(np.size(x,0))])
+    p_damper_pivot = np.array([nlprob.p_damper_pivot for _ in range(np.size(x,0))])
+    p_lower_pivot = np.array([nlprob.p_lower_pivot for _ in range(np.size(x,0))])
+    p_fa = np.array([nlprob.p_fa for _ in range(np.size(x, 0))])
+    p_fb = np.array([nlprob.p_fb for _ in range(np.size(x, 0))])
+    p_fc = np.array([nlprob.p_fc for _ in range(np.size(x, 0))])
+    p_fd = np.array([nlprob.p_fd for _ in range(np.size(x, 0))])
+    p_fe = np.array([nlprob.p_fe for _ in range(np.size(x, 0))])
+    p_ff = np.array([nlprob.p_ff for _ in range(np.size(x, 0))])
+    p_front_wheel_centre = np.array([nlprob.p_front_wheel_centre for _ in range(np.size(x, 0))])
 
-# animation ================================
+    # plt.figure(1)
+    # # plt.plot(damper_travel, z_ra - z_ra[0])
+    # motion_ratio = np.diff(z_ra)/np.diff(damper_travel)
+    # plt.plot(z_ra[0:-1] - z_ra[0], motion_ratio)
+    # plt.xlabel("wheel vertical travel [m]")
+    # plt.ylabel("motion ratio [-]")
+
+    # animation ================================
     from matplotlib import animation
-    fig = plt.figure(3, figsize=(10,6))
+    fig = plt.figure(3, figsize=(16, 8))
 
-    ax = plt.axes(xlim=(-1, 1), ylim=(-1, 1))
-    triangle1 = ax.plot([], [], 'b')[0]
-    triangle2 = ax.plot([], [], 'r')[0]
-    lowerlink = ax.plot([], [], 'r')[0]
+    ax = plt.axes(xlim=(-1, 2), ylim=(-0.5, 1))
+    plt.title('5010 rear kinematics')
+    # plt.axis('equal')
+
+    frame_width = 6
+    frame_color = 'purple'
+    rim_width = 4
+    link_width = 4
+    main_frame = ax.plot([],[], 'k', linewidth=frame_width, color=frame_color)[0]
+    triangle1 = ax.plot([], [], 'b', linewidth=frame_width, color=frame_color)[0]
+    triangle2 = ax.plot([], [], 'b', linewidth=link_width, color='black')[0]
+    lower_link = ax.plot([], [], 'g')[0]
     damper = ax.plot([], [], 'g')[0]
+    rear_wheel = ax.plot([], [], 'k', linewidth=rim_width)[0]
+    front_wheel = ax.plot([], [], 'k', linewidth=rim_width)[0]
+    ha_list = (triangle1, triangle2, lower_link, damper, rear_wheel, main_frame, front_wheel)
 
     ax.scatter(*nlprob.p_bb, label='bb')
     ax.scatter(*nlprob.p_lower_pivot, label='lower pivot')
     ax.scatter(*nlprob.p_rocker_pivot, label='rocker pivot')
     ax.scatter(*nlprob.p_damper_pivot, label='damper pivot')
+    ax.scatter(*nlprob.p_front_wheel_centre, label='front wheel center')
 
-    ax.scatter(x[:, idx['ax']], x[:, idx['az']], label='rear axle')
-    ax.scatter(x[:, idx['bx']], x[:, idx['bz']], label='triangle lower link')
-    ax.scatter(x[:, idx['cx']], x[:, idx['cz']], label='triangle upper link')
-    ax.scatter(x[:, idx['dx']], x[:, idx['dz']], label='rocker damper link')
+    ax.plot(p_a[:, 0], p_a[:,1], 'r--', label='rear axle')
+    ax.plot(p_b[:, 0], p_b[:,1], 'r--', label='triangle lower link')
+    ax.plot(p_c[:, 0], p_c[:,1], 'r--', label='triangle upper link')
+    ax.plot(p_d[:, 0], p_d[:,1], 'r--', label='rocker damper link')
     plt.xlabel("x [m]")
     plt.ylabel("y [m]")
 
-    plt.axis('equal')
     plt.legend()
 
-
-    data_triangle1 = np.array(([x[:, idx['ax']], x[:, idx['bx']], x[:, idx['cx']]], [x[:, idx['az']], x[:, idx['bz']], x[:, idx['cz']]]))
-    fixed_point = np.array([nlprob.p_rocker_pivot for _ in range(np.size(x,0))])
-    data_triangle2 = np.array(([x[:, idx['cx']], x[:, idx['dx']], fixed_point[:,0]], [x[:, idx['cz']], x[:, idx['dz']], fixed_point[:, 1]]))
-    p_damper_pivot = np.array([nlprob.p_damper_pivot for _ in range(np.size(x,0))])
-    p_d = x[:, [idx['dx'], idx['dz']]]
-    p_lower_pivot = np.array([nlprob.p_lower_pivot for _ in range(np.size(x,0))])
-    p_b = x[:, [idx['bx'], idx['bz']]]
-
-
     def init():
-        triangle1.set_xdata(np.empty([1, 2]))
-        triangle1.set_ydata(np.empty([1, 2]))
-        triangle2.set_xdata(np.empty([1, 2]))
-        triangle2.set_ydata(np.empty([1, 2]))
-        lowerlink.set_xdata(np.empty([1, 2]))
-        lowerlink.set_ydata(np.empty([1, 2]))
-        damper.set_xdata(np.empty([1, 2]))
-        damper.set_ydata(np.empty([1, 2]))
+        [init_one(ha) for ha in ha_list]
+        return ha_list
 
-        return triangle1, triangle2, lowerlink, damper
+    def init_one(ha):
+        ha.set_xdata(np.empty([1, 2]))
+        ha.set_ydata(np.empty([1, 2]))
+        pass
 
-    def update_triangle(triangle, data, i):
-        datax = np.array([data[0, 0, i], data[0, 1, i], data[0, 2, i], data[0, 0, i]])
-        datay = np.array([data[1, 0, i], data[1, 1, i], data[1, 2, i], data[1, 0, i]])
-        triangle.set_xdata(datax)
-        triangle.set_ydata(datay)
-        return triangle
+    def update_circle(circle, c, i, r=0.34925):
+        theta = np.linspace(0, 2*np.pi, 201)
+        datax = c[i, 0] + r*np.cos(theta)
+        datay = c[i, 1] + r*np.sin(theta)
+        circle.set_xdata(datax)
+        circle.set_ydata(datay)
+        return circle
 
-    def update_line(line, p1, p2, i):
-        datax = np.array((p1[i, 0], p2[i, 0]))
-        datay = np.array((p1[i, 1], p2[i, 1]))
-        line.set_xdata(datax)
-        line.set_ydata(datay)
-        return line
+    def update_connected_dots(object, data, i):
+        object.set_xdata(data[i, :, 0])
+        object.set_ydata(data[i, :, 1])
+        return object
 
     def animate(i):
-        t1 = update_triangle(triangle1, data_triangle1, i)
-        t2 = update_triangle(triangle2, data_triangle2, i)
-        l1 = update_line(lowerlink, p_b, p_lower_pivot, i)
-        l2 = update_line(damper, p_d, p_damper_pivot, i)
+        t1 = update_connected_dots(triangle1, np.stack((p_a, p_b, p_c, p_a), axis=1), i)
+        t2 = update_connected_dots(triangle2, np.stack((p_c, p_d, p_rocker_pivot, p_c), axis=1), i)
+        l1 = update_connected_dots(lower_link, np.stack((p_b, p_lower_pivot), axis=1), i)
+        l2 = update_connected_dots(damper, np.stack((p_d, p_damper_pivot), axis=1), i)
+        c1 = update_circle(rear_wheel, p_a, i)
+        f1 = update_connected_dots(main_frame, np.stack((p_fe, p_fa, p_fb, p_fc, p_fd, p_fe, p_ff, p_fe), axis=1), i)
+        c2 = update_circle(front_wheel, p_front_wheel_centre, i)
 
-        # datax = np.array([x[i, idx['ax']], x[i, idx['bx']], x[i, idx['cx']], x[i, idx['ax']]])
-        # datay = np.array([x[i, idx['az']], x[i, idx['bz']], x[i, idx['cz']], x[i, idx['az']]])
-        # triangle1.set_xdata(datax)
-        # triangle1.set_ydata(datay)
-        return t1, t2, l1, l2
+        return t1, t2, l1, l2, c1, f1, c2
 
     t_total = 3
     t_interval = t_total*1000/n_point
