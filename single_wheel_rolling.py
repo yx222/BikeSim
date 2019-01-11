@@ -7,14 +7,18 @@ import matplotlib.pyplot as plt
 from scipy import interpolate
 
 
-def get_force_from_contact_surface(qb, qc, r, k):
-    distance_bc = np.sqrt(np.sum((qb - qc) ** 2, axis=0))
+def get_force_from_contact_surface(qb, qc, v, r, k):
+    distance_bc = np.linalg.norm(qb - qc)
     compression = r - distance_bc
     if compression < 0:
-        k = -k*1e-6 # a spring to help the wheel return to the ground when it's in the airå
+        k = -k*1e-6  # a spring to help the wheel return to the ground when it's in the airå
 
-    force = compression * k * (qb - qc) / distance_bc
+    spring_force = compression * k * (qb - qc) / distance_bc
 
+    cd = 0.4
+    drag_force = -0.5*cd*v*np.linalg.norm(v)
+
+    force = spring_force + drag_force
     return force
 
 # TO BE OPTIMIZED
@@ -36,8 +40,9 @@ def single_wheel_ode(q_and_p, t, surface, r, k, m, g):
     vz = q_and_p[3]
 
     q = np.array([x, z])
+    v = np.array([vx, vz])
     qc = get_closest_point(surface, q)
-    force = get_force_from_contact_surface(q, qc, r, k)
+    force = get_force_from_contact_surface(q, qc, v, r, k)
 
     dxdt = vx
     dzdt = vz
@@ -46,14 +51,34 @@ def single_wheel_ode(q_and_p, t, surface, r, k, m, g):
 
     return [dxdt, dzdt, dvxdt, dvzdt]
 
-def plot_circle(circle, c, r):
-    theta = np.linspace(0, 2*np.pi, 201)
+def generate_circle_data(c, r):
+    theta = np.linspace(0, 2 * np.pi, 51)
     datax = c[0] + r*np.cos(theta)
     datay = c[1] + r*np.sin(theta)
-    circle.set_xdata(datax)
-    circle.set_ydata(datay)
-    return circle
+    circle_data = np.array([datax, datay])
+    return circle_data
 
+def update_connected_dots(ha, data, i):
+    if data.ndim == 2:
+        data = np.expand_dims(data, axis=2)
+
+    ha.set_xdata(data[i, 0, :])
+    ha.set_ydata(data[i, 1, :])
+    return
+
+def animate_one_frame(i, h_list, list_of_data):
+    for ha_idx, ha in enumerate(h_list):
+        update_connected_dots(ha, list_of_data[ha_idx], i)
+    return
+
+def run_animation(fig, h_list, list_of_data, frame_number):
+    t_total = 10
+    t_interval = t_total*1000/frame_number # [ms]
+    anim = animation.FuncAnimation(fig, animate_one_frame, fargs=(h_list, list_of_data), frames=frame_number,
+                                   interval=t_interval, blit=False, repeat=False)
+    return anim
+
+# main function ================================================
 def main():
     # constants
     R = 0.4  # [m]
@@ -63,49 +88,84 @@ def main():
 
     # surface definition
     surface_offset = 1
-    xs = np.linspace(0, 5, 100)
-    zs = np.linspace(0, 0, xs.size) + surface_offset
-    # zs = np.sin(xs/20 * 2 * np.pi)
-    surface = np.array([xs, zs])
+    xs = np.linspace(-5, 5, 100)
+    xs = np.concatenate((xs, np.linspace(5.1, 6,10)), axis=0)
+    # zs = np.linspace(0, 0, xs.size) + surface_offset
+    # zs = np.cos(xs/5 * 2 * np.pi)
+    step_height = 0.1
+    zs = (np.tanh((xs-2)*10)+1)*step_height + surface_offset
 
     # initial status
-    qb_0 = np.array([1.2, 0.38+1 + surface_offset])
-    vb_0 = np.array([1, 0])
-    q_and_p0 = np.concatenate((qb_0, vb_0), axis=None)
+    qb_0 = np.array([0, R-M*G/K + surface_offset])
+    vb_0 = np.array([5, 0])
 
     max_deflection = np.sqrt((0.5*M*vb_0[1]**2 + G*qb_0[1]*M)*2/K)
-
     print(max_deflection)
 
     # time steps for the ODE solver
-    t = np.linspace(0, 6, 150)
-
-    # check the closest point and the force ==============================
-    qc = get_closest_point(surface, qb_0)
-    print(qc)
-    force = get_force_from_contact_surface(qb_0, qc, R, K)
-    print(force)
-    # end check =====================================================
+    t_steps_number = 100
+    t = np.linspace(0, 5, t_steps_number)
 
     # solve ODE ========================
+    surface = np.array([xs, zs])
+    q_and_p0 = np.concatenate((qb_0, vb_0), axis=None)
+
     atol = np.array([1E-3, 1E-6, 1E-2, 1E-6])*1E-6
     rtol = 1E-9
-    q_and_p = odeint(single_wheel_ode, q_and_p0, t, args=(surface, R, K, M, G), h0=0.01, rtol=rtol, atol=atol)
+    q_and_p = odeint(single_wheel_ode, q_and_p0, t, args=(surface, R, K, M, G), h0=0.001, hmax=0.001, rtol=rtol, atol=atol)
+
+    # reorganize ode solution data structure
+    qb = q_and_p[:, (0, 1)]
+    vb = q_and_p[:, (2, 3)]
+
+    # get the force and closest point at each time step ===================
+    q_closest = np.array([get_closest_point(surface, q) for q in qb])
+    force = np.array([get_force_from_contact_surface(qb, qc, vb, R, K) for qb, qc, vb in zip(qb, q_closest, vb)])
+
+    # check the closest point and the force ==============================
+    print("initial velocity vx={0:9.2f}[m/s], vy={1:9.2f}[m/s]".format(*vb[0, :]))
+    print("first closest point x={0:9.2f}[m], y={1:9.2f}[m]".format(*q_closest[0, :]))
+    print("first force vector fx={0:9.2f}[N], fy={1:9.2f}[N]".format(*force[0, :]))
+    # end check =====================================================
 
     # plots ==============================================
-    rim_width = 2
+    rim_width = 6
+    lim_buffer = 2
+    xmin = np.min(surface, axis=1)[0] - lim_buffer
+    xmax = np.max(surface, axis=1)[1] + lim_buffer
+    ymin = np.min(force[:, 1]) - lim_buffer
+    ymax = np.max(force[:, 1]) + lim_buffer
 
     fig = plt.figure(1)
-    ax = plt.axes(xlim=(0, 5), ylim=(-3, 8))
+    ax = plt.axes(xlim=(xmin, xmax), ylim=(ymin, ymax))
+    wheel_center_traj = ax.plot(qb[:, 0], qb[:, 1], 'k:')[0]
     surface_line = ax.plot(xs, zs, 'k-')[0]
-    wheel = ax.plot([], [], 'k', linewidth=rim_width)[0]
-    plot_circle(wheel, qb_0, R)
-    closet_point = ax.plot(qc[0], qc[1], 'r.')[0]
-    force_vector = ax.plot([qc[0], force[0]], [qc[1], force[1]], 'b-')[0]
-    wheel_center_traj = ax.plot(q_and_p[:, 0], q_and_p[:, 1], 'k-*')[0]
+    plt.axis('equal')
+    plt.title('wheel simulation')
+    plt.xlabel("x [m]")
+    plt.ylabel("y [m]")
+
+    # initiate plot objects for animation
+    h_wheel = ax.plot([], [], 'k', linewidth=rim_width)[0]
+    h_wheel_center = ax.plot([], [], 'r.')[0]
+    h_closest_point = ax.plot([], [], 'r.')[0]
+    h_force_vector = ax.plot([], [], 'b-')[0]
+    h_wheel_velocity = ax.plot([], [], 'b-')[0]
+
+    # prepare data for animation function
+    wheel_data = np.stack([generate_circle_data(c, R) for c in qb])  # wheel_data.shape returns (n_time_steps, x_and_y=2, number of points at each step)
+    force_vector = np.stack((q_closest, force + q_closest), axis=2) # force_vector.shape returns (n_time_steps, x_and_y=2, number of points at each step)
+    wheel_velocity_vector = np.stack((qb, vb + qb), axis=2)
+    list_of_data = [wheel_data, qb, q_closest, force_vector, wheel_velocity_vector]  # list of arrays with different dimensions
+    h_list = [h_wheel, h_wheel_center, h_closest_point, h_force_vector, h_wheel_velocity]
+
+    # run animation
+    anim = run_animation(fig, h_list, list_of_data, t_steps_number)
 
     plt.show()
     # end plot =================================================
+
+    anim.save('rolling_wheel.mp4')
 
     return
 
