@@ -4,10 +4,6 @@ from autograd import grad, jacobian
 from scipy.integrate import odeint
 from matplotlib import animation
 import matplotlib.pyplot as plt
-from scipy import interpolate
-from scipy import optimize
-# from sympy import *
-from scipy import misc
 
 # custom modules
 import roadmodel
@@ -31,17 +27,8 @@ def get_force_from_contact_surface(qb, qc, v, r, k):
     force = spring_force + drag_force
     return (force, spring_force, drag_force)
 
-def get_closest_point(r, road_func, qb):
-    version = 1
-    if version == 1:
-        qc = get_closest_point_v1(r, road_func['f'], qb)
-    elif version == 2:
-        qc = get_closest_point_v2(r, road_func, qb)
-
-    return qc
-
 # TO BE OPTIMIZED
-def get_closest_point_v1(r, z_func, qb):
+def get_closest_point(r, z_func, qb):
     # TIME CONSUMING, SHOULD BE DONE FASTER]
     npoint = 100
     x_start = qb[0]
@@ -52,30 +39,6 @@ def get_closest_point_v1(r, z_func, qb):
     qc = surface[:, qc_idx]
     return qc
 
-def get_closest_point_v2(r, road_func, qb):
-    x_start = qb[0]
-
-    # sol = optimize.root(func_to_solve, args=(z_func, qb), x0=x_start)
-    # x_sol = sol.x
-
-    window = 0.01
-    npoint = 100
-
-    # x_sol = optimize.bisect(func_to_solve, x_start, x_start+window, args=(z_func, qb))
-
-    x_start = qb[0]
-    xx = np.linspace(x_start-window, x_start+window, npoint)
-    yy = [func_to_solve(x, road_func, qb) for x in xx]
-    qc_idx = np.argmin(np.absolute(yy))
-    x_sol = xx[qc_idx]
-
-    qc = np.array((x_sol, road_func['f'](x_sol)))
-
-    return qc
-
-def func_to_solve(x, road_func, qb):
-    fval = road_func['dfdx'](x) * (road_func['f'](x) - qb[1]) - qb[0] + x
-    return fval
 
 def single_wheel_ode(q_and_p, t, road_func, r, k, m, g):
     x = q_and_p[0]
@@ -86,7 +49,7 @@ def single_wheel_ode(q_and_p, t, road_func, r, k, m, g):
     q = np.array([x, z])
     v = np.array([vx, vz])
 
-    qc = get_closest_point(r, road_func, q)
+    qc = get_closest_point(r, road_func['f'], q)
     force, *__ = get_force_from_contact_surface(q, qc, v, r, k)
 
     dxdt = vx
@@ -98,7 +61,7 @@ def single_wheel_ode(q_and_p, t, road_func, r, k, m, g):
 
     return [dxdt, dzdt, dvxdt, dvzdt]
 
-def aug_single_wheel_ode(state, t, road_spline, r, k, m, g):
+def aug_single_wheel_ode(state, t, road_spline, r, k, c, m, g):
     x = state[0]
     z = state[1]
     vx = state[2]
@@ -106,22 +69,29 @@ def aug_single_wheel_ode(state, t, road_spline, r, k, m, g):
     s = state[4]
     n = state[5]
 
-    fx, fz = roadmodel.get_force(s, n, road_spline, k)
-
     # get curvilinear road property from splines
     # zeta is the angle of the x-y coordinate w.r.t. curvilinear coordinate angle theta.
     # Since x-y is inertia, zeta = -theta
     zeta = -road_spline['theta'](s)
     kappa = road_spline['kappa'](s)
 
+    # kinematic derivatives
     dxdt = vx
     dzdt = vz
-    dvxdt = fx/m
-    dvzdt = fz/m - g
     dsdt = (vx*np.cos(zeta) - vz*np.sin(zeta))/(1 - n*kappa)
     dndt = vx*np.sin(zeta) + vz*np.cos(zeta)
 
-    return [dxdt, dzdt, dvxdt, dvzdt, dsdt, dndt]
+    fx, fz = roadmodel.get_force(s, n, dndt, road_spline, k, c)
+
+    dvxdt = fx/m
+    dvzdt = fz/m - g
+
+    dstatedt = [dxdt, dzdt, dvxdt, dvzdt, dsdt, dndt]
+
+    print("s: {:.1f} n: {:2f} theta: {:1f}".format(s, n, -zeta*180/np.pi))
+
+
+    return dstatedt
 
 def generate_circle_data(c, r):
     theta = np.linspace(0, 2 * np.pi, 51)
@@ -155,13 +125,14 @@ def main():
     # constants
     R = 0.4  # [m]
     K = 3.5E4 # [N/m]
+    C = 20 # [N*s/m]
     M = 2   # total weight of the person and the wheel [kg]
     G = 9.8 # [m/s**2]
 
     # surface definition
     surface_offset = 1
 
-    step_height = 0.15*2
+    step_height = R*0.8
 
     def z_func(x):
         # zs = np.linspace(0, 0, xs.size) + surface_offset
@@ -207,7 +178,7 @@ def main():
 
         atol = np.array([1E-3, 1E-6, 1E-2, 1E-6, 1E-3, 1E-3]) * 1E-6
         rtol = 1E-9
-        state = odeint(aug_single_wheel_ode, state_0, t, args=(road_spline, R, K, M, G), h0=0.001, hmax=0.001, rtol=rtol,
+        state = odeint(aug_single_wheel_ode, state_0, t, args=(road_spline, R, K, C, M, G), h0=0.001, hmax=0.001, rtol=rtol,
                        atol=atol)
 
     # reorganize ode solution data structure
@@ -215,7 +186,7 @@ def main():
     vb = state[:, (2, 3)]
 
     # get the force and closest point at each time step ===================
-    q_closest = np.array([get_closest_point(R, road_func, q) for q in qb])
+    q_closest = np.array([get_closest_point(R, road_func['f'], q) for q in qb])
     force, spring_force, drag_force = zip(*[get_force_from_contact_surface(qb, qc, vb, R, K) for qb, qc, vb in zip(qb, q_closest, vb)])
     force = np.array(force)
     spring_force = np.array(spring_force)

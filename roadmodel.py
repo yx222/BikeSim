@@ -40,24 +40,31 @@ def get_distance(x, z):
     return s
 
 
-def get_force(s, n, road_spline, k):
+def get_force(s, n, ndot, road_spline, k, c):
     # compute the force in cartesian coordinate, for a wheel at s, n location in the curvilinear force field
     # k is spring rate in N/m, and is +ve. So the force must be opposite to deflection.
+    # c is the viscous term N*s/m, where F = -lambda*v
 
     # also for n > 0, the force should be zero! (no deflection, wheel in the air), but we put in a small term to
     # help the numerics (so it still sees the gradient in the n direciton , even when in the air!)
 
     if n > 0:
         k = k*1e-6
+        c = c*1e-6
 
     theta = road_spline['theta'](s)
-    fx = -n*k*np.sin(-theta)
-    fz = -n*k*np.cos(-theta)
+
+    f = -n*k - c*ndot
+    fx = f*np.sin(-theta)
+    fz = f*np.cos(-theta)
 
     return fx, fz
 
 
-def sn2xz(s, n, road_spline, x0=0, z0=0):
+def sn2xz(s, n, road_spline):
+    x0 = road_spline['x'](s)
+    z0 = road_spline['z'](x0)
+
     theta = road_spline['theta'](s)
     x = x0 + np.cos(-theta)*n
     z = z0 + np.sin(-theta)*n
@@ -115,21 +122,22 @@ def build_force_field(z_func, x_min, x_max, r):
     # compute theta spline
     thetaspline = PchipInterpolator(s, theta)
 
+    # x as a function of s
+    xspline = PchipInterpolator(s, xs)
+
     # kappa is just the 1st derivative of theta w.r.t. s
     def kappaspline(ss):
         return thetaspline(ss, 1)
 
     # put everything in a dictinonary
     road_spline = {'z':     zspline,
+                   'x':     xspline,
                    'theta': thetaspline,
                    'kappa': kappaspline}
 
     return road_spline
 
-
-def main():
-    r = 0.2
-
+def get_road(x_min, x_max, r):
     # surface definition
     # manually assigned value, further work needs to be done
     surface_offset = 1
@@ -137,16 +145,22 @@ def main():
     def z_func(x):
         # zs = np.linspace(0, 0, xs.size) + surface_offset
         # zs = np.cos(x * 5 * np.pi)*0.3
-        zs = (np.tanh((x-2)*20)+1)*step_height + surface_offset
+        zs = (np.tanh((x-2)*20)+1)*step_height/2 + surface_offset
         return zs
 
-    n_point = 100
+    road_spline = build_force_field(z_func, x_min, x_max, r)
+    return road_spline
+
+
+def main():
+    r = 0.4
     x_min = 1.5
     x_max = 2.5
-    x_surf = np.linspace(x_min, x_max, n_point)
-    z_surf = z_func(x_surf)
+    road_spline = get_road(x_min, x_max, r)
 
-    road_spline = build_force_field(z_func, x_min, x_max, r)
+    n_point = 100
+    x_surf = np.linspace(x_min, x_max, n_point)
+    z_surf = road_spline['z'](x_surf)
 
     x_fine = np.linspace(x_min, x_max, n_point*10)
     z_fine = road_spline['z'](x_fine)
