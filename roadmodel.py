@@ -66,8 +66,8 @@ def sn2xz(s, n, road_spline):
     z0 = road_spline['z'](x0)
 
     theta = road_spline['theta'](s)
-    x = x0 + np.cos(-theta)*n
-    z = z0 + np.sin(-theta)*n
+    x = x0 + np.sin(-theta)*n
+    z = z0 + np.cos(-theta)*n
 
     return x, z
 

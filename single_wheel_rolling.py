@@ -152,7 +152,7 @@ def main():
 
     # initial status
     qb_0 = np.array([-1, R-M*G/K + surface_offset])
-    vb_0 = np.array([5, 0])
+    vb_0 = np.array([0, 0])
 
     # time steps for the ODE solver
     t_steps_number = 100
@@ -171,8 +171,8 @@ def main():
         road_spline = roadmodel.build_force_field(road_func['f'], x_min, x_max, R)
 
         s0 = 0
-        n0 = -M*G/K
-        x0, z0 = roadmodel.sn2xz(s0, n0, road_spline, x0=x_min, z0=z_func(x_min)+R)
+        n0 = -M*G/K + 0.5
+        x0, z0 = roadmodel.sn2xz(s0, n0, road_spline)
         state_0 = np.concatenate((x0, z0, vb_0, s0, n0), axis=None)
         print(state_0.shape)
 

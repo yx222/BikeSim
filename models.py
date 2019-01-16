@@ -33,10 +33,10 @@ class RigidBike(object):
                          'rear axle': np.array([-0.423, 0.0156]) - self.cog}
 
         # some other properties
-        self.m = 10 # [kg], including rider and wheels
-        self.Iyy = 0.5*self.m*0.6**2 # [kgm^2] just a guess
+        self.m = 70 # [kg], including rider and wheels
+        self.Iyy = 0.5*self.m*0.8**2 # [kgm^2] just a guess
         self.k = 3.5E4
-        self.c = 20
+        self.c = 500
 
         self.road_spline = road_spline
 
@@ -48,24 +48,12 @@ class RigidBike(object):
     def get_control(self, x, name):
         return x[self.control_enum[name]]
 
-    def get_wheel_force(self, x, u):
-        s_front = self.get_state(x, 's_front')
-        n_front = self.get_state(x, 'n_front')
-        s_rear = self.get_state(x, 's_rear')
-        n_rear = self.get_state(x, 'n_rear')
-
-        # FIXME: temporary set dndt to 0
-        dndt_front = dndt_rear = 0
+    def get_force_moment(self, x, u, s_front, n_front, dndt_front, s_rear, n_rear, dndt_rear):
+        # fx_front, fz_front, fx_rear, fz_rear = self.get_wheel_force(x, u)
 
         # The forces here are in inertia coordiate, like the states
         fx_front, fz_front = roadmodel.get_force(s_front, n_front, dndt_front, self.road_spline, self.k, self.c)
         fx_rear, fz_rear = roadmodel.get_force(s_rear, n_rear, dndt_rear, self.road_spline, self.k, self.c)
-
-
-        return fx_front, fz_front, fx_rear, fz_rear
-
-    def get_force_moment(self, x, u):
-        fx_front, fz_front, fx_rear, fz_rear = self.get_wheel_force(x, u)
 
         p_front = self.position['front axle']
         p_rear = self.position['rear axle']
@@ -107,18 +95,6 @@ class RigidBike(object):
         # da_pitch/dt = n_pitch
         xdot[self.state_enum['a_pitch']] = n_pitch
 
-        # calculate the forces and moments on cog
-        fx, fz, my = self.get_force_moment(x, u)
-
-        # dvx/dt = fx/m
-        xdot[self.state_enum['vx']] = fx/self.m
-
-        # dvz/dt = fz/m
-        xdot[self.state_enum['vz']] = fz/self.m
-
-        # dnpitch/dt = my/Iyy
-        xdot[self.state_enum['n_pitch']] = my/self.Iyy
-
         # wheel curvilinear derivatives
         R_matrix = np.array([[np.cos(a_pitch), -np.sin(a_pitch)],
                      [np.sin(a_pitch),  np.cos(a_pitch)]])
@@ -130,6 +106,18 @@ class RigidBike(object):
         # kinematic derivatives
         dsdt_front, dndt_front = vxy2vsn(v_front[0], v_front[1], s_front, n_front, self.road_spline)
         dsdt_rear, dndt_rear = vxy2vsn(v_rear[0], v_rear[1], s_rear, n_rear, self.road_spline)
+
+        # calculate the forces and moments on cog
+        fx, fz, my = self.get_force_moment(x, u, s_front, n_front, dndt_front, s_rear, n_rear, dndt_rear)
+
+        # dvx/dt = fx/m
+        xdot[self.state_enum['vx']] = fx/self.m
+
+        # dvz/dt = fz/m
+        xdot[self.state_enum['vz']] = fz/self.m
+
+        # dnpitch/dt = my/Iyy
+        xdot[self.state_enum['n_pitch']] = my/self.Iyy
 
         xdot[self.state_enum['s_front']] = dsdt_front
         xdot[self.state_enum['n_front']] = dndt_front
@@ -166,19 +154,18 @@ def run_fwd():
 
     # some constants
     R = 0.4  # [m]
-    K = 3.5E4 # [N/m]
-    C = 20 # [N*s/m]
 
     # surface definition
-    surface_offset = 1
-    step_height = R*0.2
+    surface_offset = 0
+    step_height = R*0.5*4
     x_min = -1
-    x_max = 5
+    x_max = 20
 
     def z_func(x):
         # zs = np.linspace(0, 0, xs.size) + surface_offset
-        # zs = np.cos(xs/5 * 2 * np.pi)
-        return (np.tanh((x-3)*20)+1)*step_height/2 + surface_offset
+        # zs = np.sin(x/10 * 2 * np.pi)* step_height*2
+        zs = (np.tanh((x-3)*1)+1)*step_height/2 + surface_offset
+        return zs
 
     road_spline = roadmodel.build_force_field(z_func, x_min, x_max, R)
 
@@ -191,15 +178,15 @@ def run_fwd():
     # easier)
 
     # FIXME: here we create a road that is flat at x = 0, and we know s = x-xmin, n = z, a_pitch = 0
-    s_rear = 0
-    n_rear = -rigid_bike.m*g/rigid_bike.k/2
+    s_rear = 1
+    n_rear = -rigid_bike.m*g/rigid_bike.k/2 + 0.0
     delta = rigid_bike.position['front axle'] - rigid_bike.position['rear axle']
     s_front = s_rear + delta[0]
     n_front = n_rear + delta[1]
 
-    px = x_min - rigid_bike.position['rear axle'][0]
-    pz = surface_offset + R - rigid_bike.position['rear axle'][1]
-    vx = 5
+    px = road_spline['x'](s_rear) - rigid_bike.position['rear axle'][0]
+    pz = surface_offset + n_rear + R - rigid_bike.position['rear axle'][1]
+    vx = 10
     vz = 0
     a_pitch = 0
     n_pitch = 0
