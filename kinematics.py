@@ -9,9 +9,12 @@ def dist_con(a, b, l):
     # val = np.linalg.norm(delta) - l
     return val
 
-class kinematics(object):
+# TODO: create a geoemtry parent class, or just make thes
+class Geometry(object):
     def __init__(self):
+        # TODO: create a format for such data, json?
         # data for Santa Cruz 5010 2019 small
+
         self.p_bb = [0, 0]
         self.p_lower_pivot = np.add(self.p_bb, [0.0462, 0.0462])
         self.p_rocker_pivot = np.add(self.p_bb, [-0.03, 0.3188])
@@ -34,9 +37,15 @@ class kinematics(object):
         self.p_fe = np.add(self.p_bb, [-0.05544, 0.3003])
         self.p_ff = np.add(self.p_bb, [-0.097, 0.4158])
 
-        self.p_front_wheel_centre = np.add(self.p_bb, [0.72996 + 0.0515*np.sin(66.5/180*np.pi), 0.0515*np.cos(66.5/180*np.pi)])
+        self.p_front_wheel_centre = np.add(self.p_bb, [0.72996 + 0.0515 * np.sin(66.5 / 180 * np.pi),
+                                                       0.0515 * np.cos(66.5 / 180 * np.pi)])
 
+        # rear wheel centre at full droop
+        self.p_rear_wheel_centre = self.p_bb + np.array((-0.423, 0.0156))
+        return
 
+class Kinematics(object):
+    def __init__(self, geometry=Geometry()):
         self.idx = {'ax': 0, # RA
                     'az': 1,
                     'bx': 2, # triangle lower
@@ -47,11 +56,7 @@ class kinematics(object):
                     'dz': 7,
                     'l_damper': 8}
 
-        # rear wheel centre at full droop
-        self.p_rear_wheel_centre = self.p_bb + np.array((-0.423, 0.0156))
-
-        print(self.p_front_wheel_centre)
-        print(self.p_rear_wheel_centre)
+        self.geometry = geometry
 
         return
 
@@ -72,23 +77,23 @@ class kinematics(object):
         return grad_fun(x)
 
     def constraints(self, x):
-        #
         # The callback for calculating the constraints
-        #
+        geometry = self.geometry
+
         p_d = [self.get_val(x, 'dx'), self.get_val(x, 'dz')]
         p_c = [self.get_val(x, 'cx'), self.get_val(x, 'cz')]
         p_a = [self.get_val(x, 'ax'), self.get_val(x, 'az')]
         p_b = [self.get_val(x, 'bx'), self.get_val(x, 'bz')]
 
-        con1 = dist_con(self.p_damper_pivot, p_d, self.get_val(x, 'l_damper'))
-        con2 = dist_con(self.p_rocker_pivot, p_d, self.l_rocker_damper)
-        con3 = dist_con(self.p_rocker_pivot, p_c, self.l_rocker_triangle)
-        con4 = dist_con(p_d, p_c, self.l_rocker_middle)
+        con1 = dist_con(geometry.p_damper_pivot, p_d, self.get_val(x, 'l_damper'))
+        con2 = dist_con(geometry.p_rocker_pivot, p_d, geometry.l_rocker_damper)
+        con3 = dist_con(geometry.p_rocker_pivot, p_c, geometry.l_rocker_triangle)
+        con4 = dist_con(p_d, p_c, geometry.l_rocker_middle)
 
-        con5 = dist_con(self.p_lower_pivot, p_b, self.l_lower_link)
-        con6 = dist_con(p_a, p_b, self.l_triangle_hor)
-        con7 = dist_con(p_a, p_c, self.l_triangle_diag)
-        con8 = dist_con(p_b, p_c, self.l_triangle_vert)
+        con5 = dist_con(geometry.p_lower_pivot, p_b, geometry.l_lower_link)
+        con6 = dist_con(p_a, p_b, geometry.l_triangle_hor)
+        con7 = dist_con(p_a, p_c, geometry.l_triangle_diag)
+        con8 = dist_con(p_b, p_c, geometry.l_triangle_vert)
 
         # this constraint is required to ensure that we find the correct solution (there are multiple feasible points)
         con9 = p_c[0] - p_d[0]
@@ -108,7 +113,7 @@ def solve(l_damper, x0):
     #
     # Define the problem
     #
-    nlprob = kinematics()
+    nlprob = Kinematics()
 
     n_dec = 9
     n_con = 9
@@ -137,15 +142,12 @@ def solve(l_damper, x0):
                 cu=cu
                 )
 
-    #
     # Set solver options
-    #
     #nlp.addOption('derivative_test', 'second-order')
     nlp.addOption('mu_strategy', 'adaptive')
     nlp.addOption('tol', 1e-7)
     nlp.addOption('print_level', 0)
 
-    #
     # Scale the problem (Just for demonstration purposes)
     #
     nlp.setProblemScaling(
@@ -154,9 +156,7 @@ def solve(l_damper, x0):
         )
     nlp.addOption('nlp_scaling_method', 'user-scaling')
 
-    #
     # Solve the problem
-    #
     x, info = nlp.solve(x0)
 
     print("Solution of the primal variables: x=%s\n" % repr(x))
@@ -167,6 +167,31 @@ def solve(l_damper, x0):
 
     return nlprob.idx, x
 
+def rx201(dl_stroke=0.0):
+    n_point = 20
+    damper_eye2eye = 0.21
+    damper_stroke = 0.05 + dl_stroke
+    damper_travel = np.linspace(0, damper_stroke, n_point)
+    l_damper = damper_eye2eye - damper_travel
+
+    nlprob = Kinematics()
+    #FIXME: silly hardcode
+    n_dec = 9
+    x = np.zeros((n_point, n_dec))
+
+    # we don't use list comprehension because we want to warm start
+    sol = np.zeros(n_dec)
+    for ii in range(l_damper.size):
+        idx, sol = solve(l_damper[ii], sol)
+        print("damper length {0}: RA height {1} \n".format(l_damper[ii], sol[idx["az"]]))
+        x[ii, :] = sol
+
+    x = np.array(x)
+    ax = x[:, idx['ax']]
+    az = x[:, idx['ax']]
+
+    return ax, az
+
 def main():
     import matplotlib.pyplot as plt
     n_point = 20
@@ -175,7 +200,7 @@ def main():
     damper_travel = np.linspace(0, damper_stroke, n_point)
     l_damper = damper_eye2eye - damper_travel
 
-    nlprob = kinematics()
+    nlprob = Kinematics()
     #FIXME: silly hardcode
     n_dec = 9
     x = np.zeros((n_point, n_dec))
@@ -189,25 +214,25 @@ def main():
 
     x = np.array(x)
 
-    print(x[0, idx['az']])
-
     # Draw the bicycle kinematics
     # reassign data
+    geometry = nlprob.geometry
+
     z_ra = x[:, idx['az']]
     p_d = x[:, [idx['dx'], idx['dz']]]
     p_c = x[:, [idx['cx'], idx['cz']]]
     p_b = x[:, [idx['bx'], idx['bz']]]
-    p_rocker_pivot = np.array([nlprob.p_rocker_pivot for _ in range(np.size(x,0))])
-    p_damper_pivot = np.array([nlprob.p_damper_pivot for _ in range(np.size(x,0))])
-    p_lower_pivot = np.array([nlprob.p_lower_pivot for _ in range(np.size(x,0))])
-    p_fa = np.array([nlprob.p_fa for _ in range(np.size(x, 0))])
-    p_fb = np.array([nlprob.p_fb for _ in range(np.size(x, 0))])
-    p_fc = np.array([nlprob.p_fc for _ in range(np.size(x, 0))])
-    p_fd = np.array([nlprob.p_fd for _ in range(np.size(x, 0))])
-    p_fe = np.array([nlprob.p_fe for _ in range(np.size(x, 0))])
-    p_ff = np.array([nlprob.p_ff for _ in range(np.size(x, 0))])
+    p_rocker_pivot = np.array([geometry.p_rocker_pivot for _ in range(np.size(x,0))])
+    p_damper_pivot = np.array([geometry.p_damper_pivot for _ in range(np.size(x,0))])
+    p_lower_pivot = np.array([geometry.p_lower_pivot for _ in range(np.size(x,0))])
+    p_fa = np.array([geometry.p_fa for _ in range(np.size(x, 0))])
+    p_fb = np.array([geometry.p_fb for _ in range(np.size(x, 0))])
+    p_fc = np.array([geometry.p_fc for _ in range(np.size(x, 0))])
+    p_fd = np.array([geometry.p_fd for _ in range(np.size(x, 0))])
+    p_fe = np.array([geometry.p_fe for _ in range(np.size(x, 0))])
+    p_ff = np.array([geometry.p_ff for _ in range(np.size(x, 0))])
     p_rear_wheel_centre = x[:, [idx['ax'], idx['az']]]
-    p_front_wheel_centre = np.array([nlprob.p_front_wheel_centre for _ in range(np.size(x, 0))])
+    p_front_wheel_centre = np.array([geometry.p_front_wheel_centre for _ in range(np.size(x, 0))])
 
     # plt.figure(1)
     # # plt.plot(damper_travel, z_ra - z_ra[0])
@@ -253,11 +278,11 @@ def main():
     front_wheel = ax.plot([], [], 'k', linewidth=rim_width)[0]
     ha_list = (triangle1, triangle2, lower_link, damper, rear_wheel, main_frame, front_wheel)
 
-    ax.scatter(*nlprob.p_bb, label='bb')
-    ax.scatter(*nlprob.p_lower_pivot, label='lower pivot')
-    ax.scatter(*nlprob.p_rocker_pivot, label='rocker pivot')
-    ax.scatter(*nlprob.p_damper_pivot, label='damper pivot')
-    ax.scatter(*nlprob.p_front_wheel_centre, label='front wheel centre')
+    ax.scatter(*geometry.p_bb, label='bb')
+    ax.scatter(*geometry.p_lower_pivot, label='lower pivot')
+    ax.scatter(*geometry.p_rocker_pivot, label='rocker pivot')
+    ax.scatter(*geometry.p_damper_pivot, label='damper pivot')
+    ax.scatter(*geometry.p_front_wheel_centre, label='front wheel centre')
 
     ax.plot(p_rear_wheel_centre[:, 0], p_rear_wheel_centre[:,1], 'r--', label='rear axle')
     ax.plot(p_b[:, 0], p_b[:,1], 'r--', label='triangle lower link')

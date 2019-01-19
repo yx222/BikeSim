@@ -2,6 +2,8 @@
 This module contains a collection of models of dynamical systems
 """
 # FIXME: there is a mixture of array or multiple scarlar representation of vector quantities, unify!
+from matplotlib import pyplot as plt
+from matplotlib import animation
 
 import autograd.numpy as np
 
@@ -26,7 +28,7 @@ class RigidBike(object):
         self.nu = len(self.control_names)
 
         # centre of gravity
-        self.cog = np.array([(0.77718859-0.423)/2, 0.43])
+        self.cog = np.array([(0.77718859-0.423)/2*0, 0.43])
 
         # geometry info required: relative position of the wheels w.r.t. the c.o.g when a_pitch = 0
         self.position = {'front axle': np.array([0.77718859, 0.02053558]) - self.cog,
@@ -35,10 +37,13 @@ class RigidBike(object):
         # some other properties
         self.m = 70 # [kg], including rider and wheels
         self.Iyy = 0.5*self.m*0.8**2 # [kgm^2] just a guess
-        self.k = 3.5E4
-        self.c = 500
+        self.k = 5E4
+        self.c = 500*0
+        self.R = 0.4
 
         self.road_spline = road_spline
+
+        self.lines = {}
 
         return
 
@@ -66,9 +71,19 @@ class RigidBike(object):
 
         # print("fx_f:{:.1f} fz_f:{:.1f} fx_r:{:.1f} fz_r:{:.1f} ".format(- fx_front*p_front[1], fz_front*p_front[0], - fx_rear*p_rear[1], fz_rear*p_rear[0]))
 
-        print("fx_f:{:.1f} fz_f:{:.1f} fx_r:{:.1f} fz_r:{:.1f} ".format(fx_front, fz_front, fx_rear, fz_rear))
+        # print("fx_f:{:.1f} fz_f:{:.1f} fx_r:{:.1f} fz_r:{:.1f} ".format(fx_front, fz_front, fx_rear, fz_rear))
 
         return fx, fz, my
+
+    def get_mech_energy(self, x):
+        pz = self.get_state(x, 'pz')
+        vx = self.get_state(x, 'vx')
+        vz = self.get_state(x, 'vz')
+        n_pitch = self.get_state(x, 'n_pitch')
+
+        mech_energy = 0.5*self.m*(vx**2 + vz**2) + 0.5*self.Iyy*n_pitch**2 + self.m*g*pz
+
+        return mech_energy
 
     def call_model(self, x, u):
         xdot = np.zeros(self.nx)
@@ -124,10 +139,56 @@ class RigidBike(object):
         xdot[self.state_enum['s_rear']] = dsdt_rear
         xdot[self.state_enum['n_rear']] = dndt_rear
 
+        # debug
+        mech_energy = self.get_mech_energy(x)
+        # print('mechanical energy is {:3f}kJ'.format(mech_energy))
+
         return xdot
+
+    def render(self, x):
+        if len(self.lines.keys()) == 0:
+            # create the first axes
+            # plt.plot returns a list of line object, even if the length is 1
+            self.lines['front wheel'] = plt.plot([], [], 'k')[0]
+            self.lines['rear wheel'] = plt.plot([], [], 'k')[0]
+            self.lines['frame'] = plt.plot([], [], 'k')[0]
+            self.lines['axis'] = plt.plot([], [], 'k')[0]
+
+        # extract variables
+        px = self.get_state(x, 'px')
+        pz = self.get_state(x, 'pz')
+        a_pitch = self.get_state(x, 'a_pitch')
+
+        s_front = self.get_state(x, 's_front')
+        n_front = self.get_state(x, 'n_front')
+        s_rear = self.get_state(x, 's_rear')
+        n_rear = self.get_state(x, 'n_rear')
+
+        x_front, z_front = roadmodel.sn2xz(s_front, n_front, self.road_spline)
+        x_rear, z_rear = roadmodel.sn2xz(s_rear, n_rear, self.road_spline)
+
+        p_front = np.array((x_front, z_front))
+        p_rear = np.array((x_rear, z_rear))
+        p_cog = np.array((px, pz))
+        front_wheel_data = generate_circle_data(p_front, self.R)
+        rear_wheel_data = generate_circle_data(p_rear, self.R)
+        frame_data = np.stack(([x_front, z_front], [x_rear, z_rear], p_cog, [x_front, z_front]), axis=1)
+        half_axis = np.array((np.cos(a_pitch), np.sin(a_pitch)))
+        axis_data = np.stack([p_cog - half_axis, p_cog + half_axis], axis=1)
+        self.lines['front wheel'].set_data(front_wheel_data)
+        self.lines['rear wheel'].set_data(rear_wheel_data)
+        self.lines['frame'].set_data(frame_data)
+        self.lines['axis'].set_data(axis_data)
+        return
 
 
 # =========================================== Helper Functions =========================================================
+def generate_circle_data(c, r):
+    theta = np.linspace(0, 2 * np.pi, 51)
+    x = c[0] + r*np.cos(theta)
+    y = c[1] + r*np.sin(theta)
+    return np.array((x, y))
+
 def get_enum(names):
     return dict(zip(names, range(len(names))))
 
@@ -150,7 +211,6 @@ def vxy2vsn(vx, vz, s, n, road_spline):
 def run_fwd():
     from scipy.integrate import odeint
     import matplotlib.pyplot as plt
-    import single_wheel_rolling as swr
 
     # some constants
     R = 0.4  # [m]
@@ -207,16 +267,24 @@ def run_fwd():
 
     x = odeint(ode_fcn, x0, t, h0=0.001, hmax=0.001, rtol=rtol)
 
+
+    mech_energy = np.array([rigid_bike.get_mech_energy(xx) for xx in x])
+
     plt.figure(101)
     n_col = 2
-    n_row = np.ceil(rigid_bike.nx/n_col)
+    n_row = np.ceil((rigid_bike.nx+1)/n_col)
 
     for ii in range(rigid_bike.nx):
         plt.subplot(n_row, n_col, ii+1)
         plt.plot(t, x[:, ii])
         plt.ylabel(rigid_bike.state_names[ii])
 
+    plt.subplot(n_row, n_col, rigid_bike.nx+2)
+    plt.plot(t, mech_energy/1e3)
+    plt.ylabel('ME [kJ]')
+
     plt.show()
+
 
     # prepare data for animation function
     fig = plt.figure(1)
@@ -230,36 +298,17 @@ def run_fwd():
     plt.xlabel("x [m]")
     plt.ylabel("y [m]")
 
-    s_front = x[:, rigid_bike.state_enum['s_front']]
-    n_front = x[:, rigid_bike.state_enum['n_front']]
-    s_rear = x[:, rigid_bike.state_enum['s_rear']]
-    n_rear = x[:, rigid_bike.state_enum['n_rear']]
-    a_pitch = x[:, rigid_bike.state_enum['a_pitch']]
-
-    x_front, z_front = roadmodel.sn2xz(s_front, n_front, road_spline)
-    x_rear, z_rear = roadmodel.sn2xz(s_rear, n_rear, road_spline)
-
-    print(z_front)
-
-    h_wheel_front = ax.plot([], [], 'k')[0]
-    h_wheel_rear = ax.plot([], [], 'k')[0]
-    h_cog = ax.plot([], [], 'k')[0]
-    h_axis = ax.plot([], [], 'k')[0]
-
-    p_front = np.stack((x_front, z_front), axis=1)
-    p_rear = np.stack((x_rear, z_rear), axis=1)
-    p_cog = x[:, [rigid_bike.state_enum['px'], rigid_bike.state_enum['pz']]]
-    half_axis = np.stack((np.cos(a_pitch), np.sin(a_pitch)), axis=1)
-
-    wheel_data_front = np.stack([swr.generate_circle_data(p,  R) for p in p_front])  # wheel_data.shape returns (n_time_steps, x_and_y=2, number of points at each step)
-    wheel_data_rear = np.stack([swr.generate_circle_data(p, R) for p in p_rear])  # wheel_data.shape returns (n_time_steps, x_and_y=2, number of points at each step)
-    frame_data = np.stack((p_front, p_rear, p_cog, p_front), axis=2)
-    axis_data = np.stack((p_cog-half_axis, p_cog+half_axis), axis=2)
-    list_of_data = [wheel_data_front, wheel_data_rear, frame_data, axis_data] #, drag_force_vector]  # list of arrays with different dimensions
-    h_list = [h_wheel_front, h_wheel_rear, h_cog, h_axis] #, h_drag_force_vector]
 
     # run animation
-    anim = swr.run_animation(fig, h_list, list_of_data, 100)
+    frame_number = 100
+    t_total = 10
+    t_interval = t_total*1000/frame_number # [ms]
+
+    def anim_func(i, x):
+        rigid_bike.render(x[i, :])
+
+    anim = animation.FuncAnimation(fig, anim_func, fargs=(x, ), frames=frame_number,
+                                   interval=t_interval, blit=False, repeat=False)
 
     plt.show()
     anim.save('rigid_bike.mp4')

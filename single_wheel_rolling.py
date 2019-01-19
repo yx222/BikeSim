@@ -109,8 +109,8 @@ def update_connected_dots(ha, data, i):
     return
 
 def animate_one_frame(i, h_list, list_of_data):
-    for ha_idx, ha in enumerate(h_list):
-        update_connected_dots(ha, list_of_data[ha_idx], i)
+    for h, l in zip(h_list, list_of_data):
+        update_connected_dots(h, l, i)
     return
 
 def run_animation(fig, h_list, list_of_data, frame_number):
