@@ -1,6 +1,11 @@
 import autograd.numpy as np
 from autograd import grad, jacobian
 import ipopt
+from io import StringIO
+from sys import platform as sys_pf
+if sys_pf == 'darwin':
+    import matplotlib
+    matplotlib.use("TkAgg")
 
 def dist_con(a, b, l):
     delta = np.array(a)-np.array(b)
@@ -168,6 +173,7 @@ def solve(l_damper, x0):
     return nlprob.idx, x
 
 def rx201(dl_stroke=0.0):
+    import matplotlib.pyplot as plt
     n_point = 20
     damper_eye2eye = 0.21
     damper_stroke = 0.05 + dl_stroke
@@ -190,7 +196,10 @@ def rx201(dl_stroke=0.0):
     ax = x[:, idx['ax']]
     az = x[:, idx['ax']]
 
-    return ax, az
+    plt.plot(ax, az)
+    buf = StringIO()
+    plt.savefig(buf, format='svg')
+    return buf.getvalue()
 
 def main():
     import matplotlib.pyplot as plt
