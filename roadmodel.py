@@ -77,7 +77,8 @@ def build_force_field(z_func, x_min, x_max, r):
 
     # TODO: constant? (pass from outside?)
     x_step = r/5
-    n_point = np.ceil((x_max - x_min)/x_step)
+    # BUG: n_point must be an integer
+    n_point = int(np.ceil((x_max - x_min)/x_step))
 
     # get gradient using autograd
     dzdx = grad(z_func)

@@ -28,7 +28,7 @@ class RigidBike(object):
         self.nu = len(self.control_names)
 
         # centre of gravity
-        self.cog = np.array([(0.77718859-0.423)/2*0, 0.43])
+        self.cog = np.array([(0.77718859-0.423)/2, 0.43])
 
         # geometry info required: relative position of the wheels w.r.t. the c.o.g when a_pitch = 0
         self.position = {'front axle': np.array([0.77718859, 0.02053558]) - self.cog,
@@ -38,7 +38,7 @@ class RigidBike(object):
         self.m = 70 # [kg], including rider and wheels
         self.Iyy = 0.5*self.m*0.8**2 # [kgm^2] just a guess
         self.k = 5E4
-        self.c = 500*0
+        self.c = 700
         self.R = 0.4
 
         self.road_spline = road_spline
@@ -213,6 +213,7 @@ def run_fwd():
     import matplotlib.pyplot as plt
 
     # some constants
+    # FIXME: circular dependency of bike depends on roadspline depends on R which is a bike property
     R = 0.4  # [m]
 
     # surface definition
@@ -311,7 +312,7 @@ def run_fwd():
                                    interval=t_interval, blit=False, repeat=False)
 
     plt.show()
-    anim.save('rigid_bike.mp4')
+    anim.save('rigid_bike.html')
     # end plot =================================================
 
 

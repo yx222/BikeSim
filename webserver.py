@@ -8,12 +8,13 @@ def index():
 
 @route('/plot.svg')
 def index():
-    prob = request.query.probability
+    damper_stroke = request.query.damper_stroke
     try:
-        probability = float(prob)
+        damper_stroke = float(damper_stroke)
         response.content_type = 'image/svg+xml'
-        return rx201(probability)
+        return rx201(damper_stroke)
     except ValueError:
-        abort(404, "Invalid probability: " + prob)
+        abort(404, "Invalid probability: " + damper_stroke)
 
-run(host='localhost', port=8080)
+# run(host='localhost', port=8080)
+run(host='0.0.0.0', port=8080)

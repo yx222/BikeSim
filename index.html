@@ -5,11 +5,11 @@
 <script type="text/javascript">
 jQuery(document).ready(function(){
     $('#plot').click(function() {
-        p = $('#probability').val();
+        p = $('#damper_stroke').val();
         $('#graph').attr("src","https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/0.16.1/images/loader-large.gif");
 
         $.ajax({
-          url: "plot.svg?probability=" + p,
+          url: "plot.svg?damper_stroke=" + p,
           dataType: 'text',
           success: function(response) {
             $('#graph').attr("src","data:image/svg+xml;utf8," + response);
@@ -25,8 +25,8 @@ jQuery(document).ready(function(){
 </head>
 <body>
 
-Probability:
-<input id='probability' value="0.5"/>
+DamplerStroke:
+<input id='damper_stroke' value="0.05"/>
 <input id='plot' type="button" value="Plot" />
 <p>
 <image id='graph' />

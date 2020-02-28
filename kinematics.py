@@ -172,11 +172,11 @@ def solve(l_damper, x0):
 
     return nlprob.idx, x
 
-def rx201(dl_stroke=0.0):
+def rx201(dl_stroke=0.05):
     import matplotlib.pyplot as plt
     n_point = 20
     damper_eye2eye = 0.21
-    damper_stroke = 0.05 + dl_stroke
+    damper_stroke = dl_stroke
     damper_travel = np.linspace(0, damper_stroke, n_point)
     l_damper = damper_eye2eye - damper_travel
 
@@ -194,9 +194,9 @@ def rx201(dl_stroke=0.0):
 
     x = np.array(x)
     ax = x[:, idx['ax']]
-    az = x[:, idx['ax']]
+    az = x[:, idx['az']]
 
-    plt.plot(ax, az)
+    plt.plot(ax, az, '-*')
     buf = StringIO()
     plt.savefig(buf, format='svg')
     return buf.getvalue()
@@ -347,7 +347,7 @@ def main():
 
     plt.show()
 
-    return
+    return anim
 
 
 if __name__ == '__main__':
