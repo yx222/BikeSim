@@ -13,6 +13,7 @@
  * Most likely candidate solution: [Autograd](https://github.com/HIPS/autograd) + [cyipopt](https://github.com/matthias-k/cyipopt)  
  
 * Running the docker container:
+   * clone BikeSim into ~/workspace/BikeSim
    * cd into docker folder
    * run make
    * run run_docker.sh
