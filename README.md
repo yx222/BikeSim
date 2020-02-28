@@ -11,3 +11,9 @@
     * [PyTorch](https://pytorch.org) 
  
  * Most likely candidate solution: [Autograd](https://github.com/HIPS/autograd) + [cyipopt](https://github.com/matthias-k/cyipopt)  
+ 
+* Running the docker container:
+   * cd into docker folder
+   * run make
+   * run run_docker.sh
+   * visit the website at localhost:8080
