@@ -2,6 +2,7 @@ import autograd.numpy as np
 from autograd import grad, jacobian
 import ipopt
 from io import StringIO
+import json
 from sys import platform as sys_pf
 if sys_pf == 'darwin':
     import matplotlib
@@ -14,16 +15,51 @@ def dist_con(a, b, l):
     # val = np.linalg.norm(delta) - l
     return val
 
-# TODO: create a geoemtry parent class, or just make thes
-class Geometry(object):
-    def __init__(self):
-        # TODO: create a format for such data, json?
-        # data for Santa Cruz 5010 2019 small
+class NumpyEncoder(json.JSONEncoder):
+    """ Special json encoder for numpy types """
+    def default(self, obj):
+        if isinstance(obj, (np.int_, np.intc, np.intp, np.int8,
+            np.int16, np.int32, np.int64, np.uint8,
+            np.uint16, np.uint32, np.uint64)):
+            return int(obj)
+        elif isinstance(obj, (np.float_, np.float16, np.float32, 
+            np.float64)):
+            return float(obj)
+        elif isinstance(obj,(np.ndarray,)): #### This is the fix
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
 
-        self.p_bb = [0, 0]
-        self.p_lower_pivot = np.add(self.p_bb, [0.0462, 0.0462])
-        self.p_rocker_pivot = np.add(self.p_bb, [-0.03, 0.3188])
-        self.p_damper_pivot = np.add(self.p_bb, [0.2079, 0.3904])
+def geometry_from_json(json_file):
+
+        # data for Santa Cruz 5010 2019 small
+        with open(json_file, 'r') as f:
+            geometry_dict = json.load(f)
+
+        for key, value in geometry_dict.items():
+            if value is list:
+                geometry_dict[key] = np.asarray(value)
+
+        return Geometry(geometry_dict)        
+
+class Geometry:
+    def __init__(self, geometry_dict):
+        # TODO: convert data format to json
+        # TODO: generliaze to 3d, x fwd, y to the left, and z up
+        # TODO: add checks to ensure geometry file is valid
+
+        self.__dict__ = geometry_dict
+
+        return
+
+    def save(self, file_name):
+        with open(file_name, 'w') as f:
+            json.dump(self.__dict__, f, cls=NumpyEncoder, indent=1)
+class Geometry_5010_large(Geometry):
+    def __init__(self):
+        self.p_bottom_bracket = np.array([0, 0])
+        self.p_lower_pivot = self.p_bottom_bracket + np.array([0.0462, 0.0462])
+        self.p_rocker_pivot = np.add(self.p_bottom_bracket, [-0.03, 0.3188])
+        self.p_damper_pivot = np.add(self.p_bottom_bracket, [0.2079, 0.3904])
 
         self.l_rocker_damper = 0.0947
         self.l_rocker_triangle = 0.0878
@@ -34,30 +70,38 @@ class Geometry(object):
         self.l_triangle_diag = 0.4943
         self.l_lower_link = 0.097
 
-        # frame data for drawing
-        self.p_fa = self.p_bb
-        self.p_fb = np.add(self.p_bb, [0.0739, 0])
-        self.p_fc = np.add(self.p_bb, [0.4805, 0.5313])
-        self.p_fd = np.add(self.p_fc, [-0.01386, 0.0369])
-        self.p_fe = np.add(self.p_bb, [-0.05544, 0.3003])
-        self.p_ff = np.add(self.p_bb, [-0.097, 0.4158])
+        # frame data for drawing only
+        # frame point on BB
+        self.p_front_frame_bb = self.p_bottom_bracket
+        # frame point ahead of BB (where the downtube is the same height as BB)
+        self.p_front_frame_downtube_low = np.add(self.p_bottom_bracket, [0.0739, 0])
+        # headtube lower point
+        self.p_front_frame_headtube_low = np.add(self.p_bottom_bracket, [0.4805, 0.5313])
+        # headtube upper point
+        self.p_front_frame_headtube_high = np.add(self.p_front_frame_headtube_low, [-0.01386, 0.0369])
+        # top tube joins seat stay
+        self.p_front_frame_seatstay_low = np.add(self.p_bottom_bracket, [-0.05544, 0.3003])
+        # seat tube top point
+        self.p_front_frame_seatstay_high = np.add(self.p_bottom_bracket, [-0.097, 0.4158])
 
-        self.p_front_wheel_centre = np.add(self.p_bb, [0.72996 + 0.0515 * np.sin(66.5 / 180 * np.pi),
+        self.p_front_wheel_centre = np.add(self.p_bottom_bracket, [0.72996 + 0.0515 * np.sin(66.5 / 180 * np.pi),
                                                        0.0515 * np.cos(66.5 / 180 * np.pi)])
 
         # rear wheel centre at full droop
-        self.p_rear_wheel_centre = self.p_bb + np.array((-0.423, 0.0156))
-        return
+        self.p_rear_wheel_centre = self.p_bottom_bracket + np.array((-0.423, 0.0156))
 
-class Kinematics(object):
-    def __init__(self, geometry=Geometry()):
-        self.idx = {'ax': 0, # RA
+        return geo
+
+
+class Kinematics:
+    def __init__(self, geometry):
+        self.idx = {'ax': 0, # rear axle point
                     'az': 1,
-                    'bx': 2, # triangle lower
+                    'bx': 2, # triangle lower pivot point (on lower link)
                     'bz': 3,
-                    'cx': 4, # triangle upper
+                    'cx': 4, # triangle upper pivot point (on rocker)
                     'cz': 5,
-                    'dx': 6, # rocker damper size
+                    'dx': 6, # damper point on rocker
                     'dz': 7,
                     'l_damper': 8}
 
@@ -118,7 +162,7 @@ def solve(l_damper, x0):
     #
     # Define the problem
     #
-    nlprob = Kinematics()
+    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010_large.json'))
 
     n_dec = 9
     n_con = 9
@@ -180,7 +224,7 @@ def rx201(dl_stroke=0.05):
     damper_travel = np.linspace(0, damper_stroke, n_point)
     l_damper = damper_eye2eye - damper_travel
 
-    nlprob = Kinematics()
+    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010_large.json'))
     #FIXME: silly hardcode
     n_dec = 9
     x = np.zeros((n_point, n_dec))
@@ -209,7 +253,7 @@ def main():
     damper_travel = np.linspace(0, damper_stroke, n_point)
     l_damper = damper_eye2eye - damper_travel
 
-    nlprob = Kinematics()
+    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010_large.json'))
     #FIXME: silly hardcode
     n_dec = 9
     x = np.zeros((n_point, n_dec))
@@ -234,12 +278,12 @@ def main():
     p_rocker_pivot = np.array([geometry.p_rocker_pivot for _ in range(np.size(x,0))])
     p_damper_pivot = np.array([geometry.p_damper_pivot for _ in range(np.size(x,0))])
     p_lower_pivot = np.array([geometry.p_lower_pivot for _ in range(np.size(x,0))])
-    p_fa = np.array([geometry.p_fa for _ in range(np.size(x, 0))])
-    p_fb = np.array([geometry.p_fb for _ in range(np.size(x, 0))])
-    p_fc = np.array([geometry.p_fc for _ in range(np.size(x, 0))])
-    p_fd = np.array([geometry.p_fd for _ in range(np.size(x, 0))])
-    p_fe = np.array([geometry.p_fe for _ in range(np.size(x, 0))])
-    p_ff = np.array([geometry.p_ff for _ in range(np.size(x, 0))])
+    p_front_frame_bb = np.array([geometry.p_front_frame_bb for _ in range(np.size(x, 0))])
+    p_front_frame_downtube_low = np.array([geometry.p_front_frame_downtube_low for _ in range(np.size(x, 0))])
+    p_front_frame_headtube_low = np.array([geometry.p_front_frame_headtube_low for _ in range(np.size(x, 0))])
+    p_front_frame_headtube_high = np.array([geometry.p_front_frame_headtube_high for _ in range(np.size(x, 0))])
+    p_front_frame_seatstay_low = np.array([geometry.p_front_frame_seatstay_low for _ in range(np.size(x, 0))])
+    p_front_frame_seatstay_high = np.array([geometry.p_front_frame_seatstay_high for _ in range(np.size(x, 0))])
     p_rear_wheel_centre = x[:, [idx['ax'], idx['az']]]
     p_front_wheel_centre = np.array([geometry.p_front_wheel_centre for _ in range(np.size(x, 0))])
 
@@ -287,7 +331,7 @@ def main():
     front_wheel = ax.plot([], [], 'k', linewidth=rim_width)[0]
     ha_list = (triangle1, triangle2, lower_link, damper, rear_wheel, main_frame, front_wheel)
 
-    ax.scatter(*geometry.p_bb, label='bb')
+    ax.scatter(*geometry.p_bottom_bracket, label='bb')
     ax.scatter(*geometry.p_lower_pivot, label='lower pivot')
     ax.scatter(*geometry.p_rocker_pivot, label='rocker pivot')
     ax.scatter(*geometry.p_damper_pivot, label='damper pivot')
@@ -330,7 +374,7 @@ def main():
         l1 = update_connected_dots(lower_link, np.stack((p_b, p_lower_pivot), axis=1), i)
         l2 = update_connected_dots(damper, np.stack((p_d, p_damper_pivot), axis=1), i)
         c1 = update_circle(rear_wheel, p_rear_wheel_centre, i)
-        f1 = update_connected_dots(main_frame, np.stack((p_fe, p_fa, p_fb, p_fc, p_fd, p_fe, p_ff, p_fe), axis=1), i)
+        f1 = update_connected_dots(main_frame, np.stack((p_front_frame_seatstay_low, p_front_frame_bb, p_front_frame_downtube_low, p_front_frame_headtube_low, p_front_frame_headtube_high, p_front_frame_seatstay_low, p_front_frame_seatstay_high, p_front_frame_seatstay_low), axis=1), i)
         c2 = update_circle(front_wheel, p_front_wheel_centre, i)
 
         return t1, t2, l1, l2, c1, f1, c2
