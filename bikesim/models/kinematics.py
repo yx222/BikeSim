@@ -1,12 +1,14 @@
 import autograd.numpy as np
 from autograd import grad, jacobian
 import ipopt
-from io import StringIO
 import json
+import logging
 from sys import platform as sys_pf
 if sys_pf == 'darwin':
     import matplotlib
     matplotlib.use("TkAgg")
+
+logging.getLogger().setLevel(logging.INFO)
 
 def dist_con(a, b, l):
     delta = np.array(a)-np.array(b)
@@ -55,6 +57,7 @@ class Geometry:
         with open(file_name, 'w') as f:
             json.dump(self.__dict__, f, cls=NumpyEncoder, indent=1)
 
+
 class Kinematics:
     def __init__(self, geometry):
         self.idx = {'ax': 0, # rear axle point
@@ -67,9 +70,14 @@ class Kinematics:
                     'dz': 7,
                     'l_damper': 8}
 
+        # number of decision variables
+        self.n_dec = len(self.idx)
         self.geometry = geometry
 
-        return
+        # Call the constraints once to get number of cons
+        cons = self.constraints(self.get_init_guess())
+        self.n_con = len(cons)
+
 
     def get_val(self, x, name):
         return x[self.idx[name]]
@@ -107,6 +115,7 @@ class Kinematics:
         con8 = dist_con(p_b, p_c, geometry.l_triangle_vert)
 
         # this constraint is required to ensure that we find the correct solution (there are multiple feasible points)
+        # x-position rocker pivot - damper eye on rocker
         con9 = p_c[0] - p_d[0]
 
         return np.array((con1, con2, con3, con4, con5, con6, con7, con8, con9))
@@ -119,53 +128,69 @@ class Kinematics:
         jac_fun = jacobian(self.constraints)
         return jac_fun(x)
 
+    def get_init_guess(self):
+        return np.zeros(self.n_dec)
+
+    def set_bounds(self, **kwargs):
+        self.lb = -np.ones(self.n_dec)
+        self.ub = np.ones(self.n_dec)
+
+        # WHY? constrain x position of rear axle and lower link pivot on rear triangle
+        # to be -ve
+        self.ub[self.idx['ax']] = 0
+        self.ub[self.idx['bx']] = 0
+
+        for key, val in kwargs.items():
+            if np.isscalar(val):
+                # equality bounds can be passed in as a scalar    
+                val = [val, val]
+            logging.debug(f'{key}: {val}')
+            logging.debug(f'adding bounds:  {val[0]} <= {key} <= {val[1]}')
+            self.lb[self.idx[key]] = val[0]
+            self.ub[self.idx[key]] = val[1]
+
+    def set_cons(self):
+        self.cl = np.zeros(self.n_con)
+        self.cu = np.zeros(self.n_con)
+        # last constraint is inequality on cx - dx <=0
+        self.cl[-1] = -1
+
+    def construct_nlp(self, l_damper):
+        self.set_bounds(l_damper=l_damper)
+        self.set_cons()
+
+        nlp = ipopt.problem(
+                    n=self.n_dec,
+                    m=self.n_con,
+                    problem_obj=self,
+                    lb=self.lb,
+                    ub=self.ub,
+                    cl=self.cl,
+                    cu=self.cu
+                    )
+
+            # Set solver options
+        #nlp.addOption('derivative_test', 'second-order')
+        nlp.addOption('mu_strategy', 'adaptive')
+        nlp.addOption('tol', 1e-7)
+        nlp.addOption('print_level', 0)
+
+        # Scale the problem (Just for demonstration purposes)
+        #
+        nlp.setProblemScaling(
+            obj_scaling=2,
+            x_scaling=np.ones(self.n_dec)
+            )
+        nlp.addOption('nlp_scaling_method', 'user-scaling') 
+        return nlp                   
 
 def solve(l_damper, x0):
     #
     # Define the problem
     #
-    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010_large.json'))
+    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010.json'))
 
-    n_dec = 9
-    n_con = 9
-
-    lb = -np.ones(n_dec)
-    ub = np.ones(n_dec)
-    ub[nlprob.idx['ax']] = 0
-    ub[nlprob.idx['bx']] = 0
-
-    # fix damper length
-    lb[-1] = l_damper
-    ub[-1] = l_damper
-
-    cl = np.zeros(n_con)
-    cu = np.zeros(n_con)
-    # last constraint is inequality on cx - dx <=0
-    cl[n_con-1] = -1
-
-    nlp = ipopt.problem(
-                n=len(x0),
-                m=len(cl),
-                problem_obj=nlprob,
-                lb=lb,
-                ub=ub,
-                cl=cl,
-                cu=cu
-                )
-
-    # Set solver options
-    #nlp.addOption('derivative_test', 'second-order')
-    nlp.addOption('mu_strategy', 'adaptive')
-    nlp.addOption('tol', 1e-7)
-    nlp.addOption('print_level', 0)
-
-    # Scale the problem (Just for demonstration purposes)
-    #
-    nlp.setProblemScaling(
-        obj_scaling=2,
-        x_scaling=np.ones(n_dec)
-        )
-    nlp.addOption('nlp_scaling_method', 'user-scaling')
+    nlp = nlprob.construct_nlp(l_damper=l_damper)
 
     # Solve the problem
     x, info = nlp.solve(x0)
@@ -178,35 +203,6 @@ def solve(l_damper, x0):
 
     return nlprob.idx, x
 
-def rx201(dl_stroke=0.05):
-    import matplotlib.pyplot as plt
-    n_point = 20
-    damper_eye2eye = 0.21
-    damper_stroke = dl_stroke
-    damper_travel = np.linspace(0, damper_stroke, n_point)
-    l_damper = damper_eye2eye - damper_travel
-
-    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010_large.json'))
-    #FIXME: silly hardcode
-    n_dec = 9
-    x = np.zeros((n_point, n_dec))
-
-    # we don't use list comprehension because we want to warm start
-    sol = np.zeros(n_dec)
-    for ii in range(l_damper.size):
-        idx, sol = solve(l_damper[ii], sol)
-        print("damper length {0}: RA height {1} \n".format(l_damper[ii], sol[idx["az"]]))
-        x[ii, :] = sol
-
-    x = np.array(x)
-    ax = x[:, idx['ax']]
-    az = x[:, idx['az']]
-
-    plt.plot(ax, az, '-*')
-    buf = StringIO()
-    plt.savefig(buf, format='svg')
-    return buf.getvalue()
-
 def main():
     import matplotlib.pyplot as plt
     n_point = 20
@@ -215,7 +211,7 @@ def main():
     damper_travel = np.linspace(0, damper_stroke, n_point)
     l_damper = damper_eye2eye - damper_travel
 
-    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010_large.json'))
+    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010.json'))
     #FIXME: silly hardcode
     n_dec = 9
     x = np.zeros((n_point, n_dec))
