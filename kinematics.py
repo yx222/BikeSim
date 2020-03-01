@@ -90,8 +90,6 @@ class Geometry_5010_large(Geometry):
         # rear wheel centre at full droop
         self.p_rear_wheel_centre = self.p_bottom_bracket + np.array((-0.423, 0.0156))
 
-        return geo
-
 
 class Kinematics:
     def __init__(self, geometry):
