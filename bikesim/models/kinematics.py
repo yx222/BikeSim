@@ -54,42 +54,6 @@ class Geometry:
     def save(self, file_name):
         with open(file_name, 'w') as f:
             json.dump(self.__dict__, f, cls=NumpyEncoder, indent=1)
-class Geometry_5010_large(Geometry):
-    def __init__(self):
-        self.p_bottom_bracket = np.array([0, 0])
-        self.p_lower_pivot = self.p_bottom_bracket + np.array([0.0462, 0.0462])
-        self.p_rocker_pivot = np.add(self.p_bottom_bracket, [-0.03, 0.3188])
-        self.p_damper_pivot = np.add(self.p_bottom_bracket, [0.2079, 0.3904])
-
-        self.l_rocker_damper = 0.0947
-        self.l_rocker_triangle = 0.0878
-        self.l_rocker_middle = 0.0323
-
-        self.l_triangle_hor = 0.3788
-        self.l_triangle_vert = 0.2402
-        self.l_triangle_diag = 0.4943
-        self.l_lower_link = 0.097
-
-        # frame data for drawing only
-        # frame point on BB
-        self.p_front_frame_bb = self.p_bottom_bracket
-        # frame point ahead of BB (where the downtube is the same height as BB)
-        self.p_front_frame_downtube_low = np.add(self.p_bottom_bracket, [0.0739, 0])
-        # headtube lower point
-        self.p_front_frame_headtube_low = np.add(self.p_bottom_bracket, [0.4805, 0.5313])
-        # headtube upper point
-        self.p_front_frame_headtube_high = np.add(self.p_front_frame_headtube_low, [-0.01386, 0.0369])
-        # top tube joins seat stay
-        self.p_front_frame_seatstay_low = np.add(self.p_bottom_bracket, [-0.05544, 0.3003])
-        # seat tube top point
-        self.p_front_frame_seatstay_high = np.add(self.p_bottom_bracket, [-0.097, 0.4158])
-
-        self.p_front_wheel_centre = np.add(self.p_bottom_bracket, [0.72996 + 0.0515 * np.sin(66.5 / 180 * np.pi),
-                                                       0.0515 * np.cos(66.5 / 180 * np.pi)])
-
-        # rear wheel centre at full droop
-        self.p_rear_wheel_centre = self.p_bottom_bracket + np.array((-0.423, 0.0156))
-
 
 class Kinematics:
     def __init__(self, geometry):
