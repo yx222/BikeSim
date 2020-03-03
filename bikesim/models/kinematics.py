@@ -184,15 +184,17 @@ class Kinematics:
         nlp.addOption('nlp_scaling_method', 'user-scaling') 
         return nlp                   
 
-def solve(l_damper, x0):
+def solve(l_damper, x0=None):
     #
     # Define the problem
     #
-    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010.json'))
+    nlprob = Kinematics(geometry=geometry_from_json('geometries/legacy/5010.json'))
 
     nlp = nlprob.construct_nlp(l_damper=l_damper)
 
     # Solve the problem
+    if not x0:
+        x0 = nlprob.get_init_guess()
     x, info = nlp.solve(x0)
 
     print("Solution of the primal variables: x=%s\n" % repr(x))
@@ -211,7 +213,7 @@ def main():
     damper_travel = np.linspace(0, damper_stroke, n_point)
     l_damper = damper_eye2eye - damper_travel
 
-    nlprob = Kinematics(geometry=geometry_from_json('geometries/5010.json'))
+    nlprob = Kinematics(geometry=geometry_from_json('geometries/legacy/5010.json'))
     #FIXME: silly hardcode
     n_dec = 9
     x = np.zeros((n_point, n_dec))

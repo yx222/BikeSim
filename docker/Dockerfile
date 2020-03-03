@@ -4,6 +4,7 @@ RUN conda install -c conda-forge cyipopt
 RUN conda install jupyter
 
 RUN pip install autograd
+RUN pip install parameterized
 RUN conda install matplotlib
 RUN conda install -c conda-forge ffmpeg
 

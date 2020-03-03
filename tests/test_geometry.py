@@ -4,7 +4,7 @@ import os
 from functools import wraps
 from bikesim.models import kinematics
 
-logging.getLogger().setLevel(logging.INFO)
+logging.getLogger().setLevel(logging.WARN)
 
 
 class TestKinematics(unittest.TestCase):
