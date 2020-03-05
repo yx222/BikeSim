@@ -2,11 +2,11 @@
     "bodies": {
         "front_triangle": {
             "name": "front_triangle",
-            "position": [
+            "pose": [
+                0.0,
                 0.0,
                 0.0
             ],
-            "orientation": 0.0,
             "points": {
                 "bottom_bracket": {
                     "rel_position": [
@@ -36,11 +36,11 @@
         },
         "rear_triangle": {
             "name": "rear_triangle",
-            "position": [
+            "pose": [
                 -0.4229889750112173,
-                0.015607108840916676
+                0.015607108840916676,
+                0.0
             ],
-            "orientation": 0.0,
             "points": {
                 "rear_axle": {
                     "rel_position": [
@@ -64,11 +64,11 @@
         },
         "rocker": {
             "name": "rocker",
-            "position": [
+            "pose": [
                 -0.03,
-                0.3188
+                0.3188,
+                0.0
             ],
-            "orientation": 0.0,
             "points": {
                 "front_triangle": {
                     "rel_position": [
@@ -92,11 +92,11 @@
         },
         "lower_link": {
             "name": "lower_link",
-            "position": [
+            "pose": [
                 0.0462,
-                0.0462
+                0.0462,
+                0.0
             ],
-            "orientation": 0.0,
             "points": {
                 "front_triangle": {
                     "rel_position": [
@@ -111,65 +111,14 @@
                     ]
                 }
             }
-        },
-        "damper": {
-            "name": "damper",
-            "position": [
-                0.2079,
-                0.3904
-            ],
-            "orientation": 0.0,
-            "points": {
-                "front_triangle": {
-                    "rel_position": [
-                        0.0,
-                        0.0
-                    ]
-                },
-                "rocker": {
-                    "rel_position": [
-                        -0.1641382276912782,
-                        -0.13099100042145206
-                    ]
-                }
-            }
         }
     },
     "constraints": [
         {
             "type": "Coincident",
             "data": {
-                "name": [
-                    [
-                        "damper",
-                        "rocker"
-                    ],
-                    [
-                        "rocker",
-                        "damper"
-                    ]
-                ]
-            }
-        },
-        {
-            "type": "Coincident",
-            "data": {
-                "name": [
-                    [
-                        "damper",
-                        "front_triangle"
-                    ],
-                    [
-                        "front_triangle",
-                        "damper"
-                    ]
-                ]
-            }
-        },
-        {
-            "type": "Coincident",
-            "data": {
-                "name": [
+                "name": "Coincident.rocker.front_triangle.front_triangle.rocker",
+                "point_names": [
                     [
                         "rocker",
                         "front_triangle"
@@ -184,7 +133,8 @@
         {
             "type": "Coincident",
             "data": {
-                "name": [
+                "name": "Coincident.rocker.rear_triangle.rear_triangle.rocker",
+                "point_names": [
                     [
                         "rocker",
                         "rear_triangle"
@@ -199,7 +149,8 @@
         {
             "type": "Coincident",
             "data": {
-                "name": [
+                "name": "Coincident.lower_link.rear_triangle.rear_triangle.lower_link",
+                "point_names": [
                     [
                         "lower_link",
                         "rear_triangle"
@@ -214,7 +165,8 @@
         {
             "type": "Coincident",
             "data": {
-                "name": [
+                "name": "Coincident.lower_link.front_triangle.front_triangle.lower_link",
+                "point_names": [
                     [
                         "lower_link",
                         "front_triangle"
@@ -229,7 +181,8 @@
         {
             "type": "FixedPoint",
             "data": {
-                "name": [
+                "name": "FixedPoint.front_triangle.bottom_bracket",
+                "point_name": [
                     "front_triangle",
                     "bottom_bracket"
                 ],
@@ -242,8 +195,26 @@
         {
             "type": "FixedOrientation",
             "data": {
-                "name": "front_triangle",
+                "name": "FixedOrientation.front_triangle",
+                "body_name": "front_triangle",
                 "orientation": 0.0
+            }
+        },
+        {
+            "type": "FixedDistance",
+            "data": {
+                "name": "damper_length",
+                "point_names": [
+                    [
+                        "rocker",
+                        "damper"
+                    ],
+                    [
+                        "front_triangle",
+                        "damper"
+                    ]
+                ],
+                "distance": 0.21
             }
         }
     ]

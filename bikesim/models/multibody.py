@@ -31,25 +31,28 @@ from matplotlib import pyplot as plt
 
 logging.getLogger().setLevel(logging.INFO)
 
+
 class NumpyEncoder(json.JSONEncoder):
     """ Special json encoder for numpy types """
+
     def default(self, obj):
         if isinstance(obj, (np.int_, np.intc, np.intp, np.int8,
-            np.int16, np.int32, np.int64, np.uint8,
-            np.uint16, np.uint32, np.uint64)):
+                            np.int16, np.int32, np.int64, np.uint8,
+                            np.uint16, np.uint32, np.uint64)):
             return int(obj)
-        elif isinstance(obj, (np.float_, np.float16, np.float32, 
-            np.float64)):
+        elif isinstance(obj, (np.float_, np.float16, np.float32,
+                              np.float64)):
             return float(obj)
-        elif isinstance(obj,(np.ndarray,)): #### This is the fix
+        elif isinstance(obj, (np.ndarray,)):  # This is the fix
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
 
 class MultiBodySystem:
     def __init__(self, bodies=None):
         self.bodies = {}
         self.idx_dict = {}
-        self.constraints = []
+        self.constraints = {}
 
         if bodies:
             for b in bodies:
@@ -74,38 +77,37 @@ class MultiBodySystem:
         The D.O.F. are essentially the position and orientaiton of the rigid bodies.
         """
 
-        assert(len(states)==self.num_dof), f'Expecting {self.num_dof} D.O.F., got {len(x)}'
+        assert(len(states) ==
+               self.num_dof), f'Expecting {self.num_dof} D.O.F., got {len(x)}'
 
         states = np.reshape(states, (self.num_body, 3))
         for name, idx in self.idx_dict.items():
             pose = states[idx]
-            self.bodies[name].position = pose[0:2]
-            self.bodies[name].orientation = pose[2]
+            self.bodies[name].pose = pose
 
     def get_states(self):
         states = np.zeros((self.num_body, 3))
         for name, idx in self.idx_dict.items():
-            states[idx, 0:2] = self.bodies[name].position
-            states[idx, 2] = self.bodies[name].orientation
+            states[idx, :] = self.bodies[name].pose
 
         return states.flatten()
 
     def evaluate_constraints(self):
         con_list = []
-        
-        for con in self.constraints:
+
+        for con in self.constraints.values():
             con_list.append(con.evaluate())
 
-        return np.array(con_list)
+        return np.hstack(con_list)
 
     def _add_constraint(self, constraint: Constraint):
-        self.constraints.append(constraint)
+        self.constraints[constraint.name] = constraint
 
     def connect_points(self, point_A: Point2D, point_B: Point2D):
         """
         create a constraint in the system, that point A and point B are coincidental
         """
-        
+
         self._add_constraint(Coincident(point_A, point_B))
 
     def fix_point(self, point: Point2D, position):
@@ -113,6 +115,9 @@ class MultiBodySystem:
 
     def fix_orientation(self, body: RigidBody2D, orientation):
         self._add_constraint(FixedOrientation(body, orientation))
+
+    def fix_distance(self, point_A: Point2D, point_B: Point2D, distance):
+        self._add_constraint(FixedDistance(point_A, point_B, distance))
 
     def check_system_dof(self):
         """
@@ -123,7 +128,8 @@ class MultiBodySystem:
         if num_dof == 0:
             logging.info('System is fully constrained')
         elif num_dof < 0:
-            logging.info(f'System is over-constrained by {-num_dof} constraints')
+            logging.info(
+                f'System is over-constrained by {-num_dof} constraints')
         else:
             logging.info(f'System is under-constrained with {num_dof} D.O.F.')
 
@@ -140,7 +146,7 @@ class MultiBodySystem:
 
     def find_point(self, body_name, point_name):
         return self.bodies[body_name].points[point_name]
-    
+
     def find_body(self, body_name):
         return self.bodies[body_name]
 
@@ -148,16 +154,19 @@ class MultiBodySystem:
 
         out_dict = {}
         # rigid bodies
-        out_dict['bodies'] = {name: body.to_dict() for name, body in self.bodies.items()}
+        out_dict['bodies'] = {name: body.to_dict()
+                              for name, body in self.bodies.items()}
 
         # constraints - we don't serialize constraints since they're constructed on points, which we should only refer to by name
-        out_dict['constraints'] = [c.to_dict() for c in self.constraints]
+        out_dict['constraints'] = [c.to_dict()
+                                   for c in self.constraints.values()]
 
         return out_dict
 
     @classmethod
     def from_dict(cls, input_dict):
-        bodies_list = [RigidBody2D.from_dict(body_dict) for body_dict in input_dict['bodies'].values()]
+        bodies_list = [RigidBody2D.from_dict(
+            body_dict) for body_dict in input_dict['bodies'].values()]
         system = cls(bodies_list)
 
         # add constraints
@@ -179,16 +188,14 @@ class MultiBodySystem:
 
 
 class RigidBody2D:
-    def __init__(self, name: str, position=np.zeros(2), orientation=0.):
+    def __init__(self, name: str, pose=np.zeros(2)):
         """
-        position: 2d array
-        orientation: scalar
+        pose: 3d array [x, z, pitch]
 
         x fwd, z up, pitch is counter-clockwise
         """
         self.name = name
-        self.position = position
-        self.orientation = orientation
+        self.pose = pose
 
         self.points = {}
 
@@ -209,41 +216,43 @@ class RigidBody2D:
         xy = np.array([p.get_position() for p in self.points.values()])
         xy = np.vstack((xy, xy[0]))
 
-        ax.plot(xy[:,0], xy[:, 1],  linewidth=6)
+        ax.plot(xy[:, 0], xy[:, 1],  linewidth=6)
 
     def __repr__(self):
-        return f'RigidBody2D {self.name} at {self.position} and {self.orientation}'
+        return f'RigidBody2D {self.name} at {self.pose}'
 
     def to_dict(self):
         """
         Convert data to a dictionary
         """
-        out_dict = {'name': self.name, 
-                    'position': self.position,
-                    'orientation': self.orientation, 
+        out_dict = {'name': self.name,
+                    'pose': self.pose,
                     'points': {name: point.to_dict() for name, point in self.points.items()}
-        }
+                    }
 
         return out_dict
 
     @classmethod
     def from_dict(cls, input_dict):
-        body = cls(input_dict['name'], input_dict['position'], input_dict['orientation'])
+        body = cls(input_dict['name'], input_dict['pose'])
         for name, point_dict in input_dict['points'].items():
             body.add_point(name, point_dict['rel_position'])
         return body
 
+
 class Point2D:
-    def __init__(self, name, parent:RigidBody2D, rel_position):
+    def __init__(self, name, parent: RigidBody2D, rel_position):
         self.parent = parent
         self.rel_position = rel_position
         self.name = name
 
     def get_position(self):
-        c, s = np.cos(self.parent.orientation), np.sin(self.parent.orientation)
+        pitch = self.parent.pose[2]
+        c, s = np.cos(pitch), np.sin(pitch)
         rot_matrix = np.array(((c, -s), (s, c)))
-        position = self.parent.position + np.matmul(rot_matrix, self.rel_position)
-        
+        position = self.parent.pose[0:2] + \
+            np.matmul(rot_matrix, self.rel_position)
+
         return position
 
     def __repr__(self):
@@ -252,7 +261,10 @@ class Point2D:
     def to_dict(self):
         return {'rel_position': self.rel_position}
 
+
 class Constraint:
+    name = None
+
     def __init__(self):
         pass
 
@@ -278,69 +290,116 @@ class ConstraintFactory:
             return FixedPoint.from_dict(system, data)
         elif con_type == 'FixedOrientation':
             return FixedOrientation.from_dict(system, data)
+        elif con_type == 'FixedDistance':
+            return FixedDistance.from_dict(system, data)
         else:
             raise NameError(f'{con_type} is not a valid constraint type')
-        
+
+
 class Coincident(Constraint):
-    def __init__(self, A:Point2D, B:Point2D):
+    def __init__(self, A: Point2D, B: Point2D, name=None):
         """
         Point A and Point B are coincident. Meaning x, z are the same. 2 Outputs
         """
         self.num_dof = 2
         self.A = A
         self.B = B
-    
+        if not name:
+            name = f'Coincident.{A.parent.name}.{A.name}.{B.parent.name}.{B.name}'
+        self.name = name
+
     def evaluate(self):
         return self.A.get_position() - self.B.get_position()
 
     def to_dict(self):
-        data = {'name': [(self.A.parent.name, self.A.name), (self.B.parent.name, self.B.name)]}
+        data = {'name': self.name, 'point_names': [
+            (self.A.parent.name, self.A.name), (self.B.parent.name, self.B.name)]}
         return {'type': 'Coincident', 'data': data}
 
     @classmethod
     def from_dict(cls, system, input_dict):
-        points = [system.find_point(*names) for names in input_dict['name']]
-        return cls(*points)
+        points = [system.find_point(*point_names)
+                  for point_names in input_dict['point_names']]
+        return cls(*points, name=input_dict['name'])
+
+
+class FixedDistance(Constraint):
+    def __init__(self, A: Point2D, B: Point2D, distance, name=None):
+        """
+        Point A and Point B are a fixed distance away. (but not on a rigid body)
+        """
+        self.num_dof = 1
+        self.A = A
+        self.B = B
+        self.distance = distance
+        if not name:
+            name = f'Distance.{A.parent.name}.{A.name}.{B.parent.name}.{B.name}'
+        self.name = name
+
+    def evaluate(self):
+        delta = self.A.get_position() - self.B.get_position()
+        return np.dot(delta, delta) - self.distance**2
+
+    def to_dict(self):
+        data = {'name': self.name, 'point_names': [(self.A.parent.name, self.A.name), (self.B.parent.name, self.B.name)],
+                'distance': self.distance}
+        return {'type': 'FixedDistance', 'data': data}
+
+    @classmethod
+    def from_dict(cls, system, input_dict):
+        points = [system.find_point(*names)
+                  for names in input_dict['point_names']]
+        return cls(*points, input_dict['distance'], name=input_dict['name'])
+
 
 class FixedPoint(Constraint):
-    def __init__(self, point: Point2D, position):
+    def __init__(self, point: Point2D, position, name=None):
         """
         Fix a point at a global position
         """
         self.num_dof = 2
         self.point = point
         self.position = position
+        if not name:
+            name = f'FixedPoint.{point.parent.name}.{point.name}'
+        self.name = name
 
     def evaluate(self):
         return self.point.get_position() - self.position
 
     def to_dict(self):
-        data = {'name': (self.point.parent.name, self.point.name), 'position': self.position}
+        data = {'name': self.name, 'point_name': (
+            self.point.parent.name, self.point.name), 'position': self.position}
         return {'type': 'FixedPoint', 'data': data}
 
     @classmethod
     def from_dict(cls, system, input_dict):
-        point = system.find_point(*input_dict['name'])
-        return cls(point, input_dict['position'])
+        point = system.find_point(*input_dict['point_name'])
+        return cls(point, input_dict['position'], name=input_dict['name'])
+
+
 class FixedOrientation(Constraint):
-    def __init__(self, body: RigidBody2D, orientation):
+    def __init__(self, body: RigidBody2D, orientation, name=None):
         self.num_dof = 1
         self.body = body
         self.orientation = orientation
+        if not name:
+            name = f'FixedOrientation.{body.name}'
+        self.name = name
 
     def evaluate(self):
-        return self.body.orientation - self.orientation
+        return self.body.pose[2] - self.orientation
 
     def to_dict(self):
-        data = {'name': self.body.name, 'orientation': self.orientation}
+        data = {'name': self.name, 'body_name': self.body.name,
+                'orientation': self.orientation}
         return {'type': 'FixedOrientation', 'data': data}
 
     @classmethod
     def from_dict(cls, system, input_dict):
-        return cls(system.find_body(input_dict['name']), input_dict['orientation'])
+        return cls(system.find_body(input_dict['body_name']), input_dict['orientation'], name=input_dict['name'])
 
 
-        
 def sample_usage():
     # Create system
 
@@ -371,111 +430,3 @@ def sample_usage():
 
     # Create axle height constraint (Effective rolling radius above ground)
     return 0
-
-
-from bikesim.models.kinematics import solve, geometry_from_json
-def main():
-    geo = geometry=geometry_from_json('geometries/legacy/5010.json')
-
-    logging.info(f'Current directory is {os.getcwd()}')
-    idx, x = solve(0.21)
-
-    print(x)
-
-    # Rigid body: front triangle
-    # Using bb as the ref point
-    front_triangle = RigidBody2D('front_triangle', position=np.zeros(2))
-    front_triangle.add_point('bottom_bracket', np.zeros(2))
-    front_triangle.add_point('rocker', geo.p_rocker_pivot)
-    front_triangle.add_point('damper', geo.p_damper_pivot)
-    front_triangle.add_point('lower_link', geo.p_lower_pivot)
-
-    front_triangle.list_points()
-
-
-    # Rigid body: rear triangle
-    # Using rear axle point as the ref point for the rear triangle
-    rear_triangle = RigidBody2D('rear_triangle', position=np.array((x[idx['ax']], x[idx['az']])))
-    rear_triangle.add_point('rear_axle', np.zeros(2))
-    rear_triangle.add_point('rocker', 
-                            np.array((x[idx['cx']] - x[idx['ax']],
-                                    x[idx['cz']] - x[idx['az']])))
-
-    rear_triangle.add_point('lower_link', 
-                            np.array((x[idx['bx']] - x[idx['ax']],
-                                      x[idx['bz']] - x[idx['az']])))
-
-    rear_triangle.list_points()
-
-    # Rigid body: rocker
-    # Using frame pivot point as the ref point
-    rocker = RigidBody2D('rocker', position=geo.p_rocker_pivot)
-    rocker.add_point('front_triangle', np.zeros(2))
-    rocker.add_point('rear_triangle', np.array((x[idx['cx']], x[idx['cz']])) - geo.p_rocker_pivot)
-    rocker.add_point('damper', np.array((x[idx['dx']], x[idx['dz']])) - geo.p_rocker_pivot)
-
-    rocker.list_points()
-
-    # Rigid body: lower link
-    # Use point on front triangle as the ref point
-    lower_link = RigidBody2D('lower_link', position=geo.p_lower_pivot)
-    lower_link.add_point('front_triangle', np.zeros(2))
-    lower_link.add_point('rear_triangle', np.array((x[idx['bx']], x[idx['bz']])) - geo.p_lower_pivot)
-
-    lower_link.list_points()
-
-
-    # Rigid body: damper
-    # Using frame pivot point as the ref point
-    damper = RigidBody2D('damper', position=geo.p_damper_pivot)
-    damper.add_point('front_triangle', np.zeros(2))
-    damper.add_point('rocker', np.array((x[idx['dx']], x[idx['dz']])) - geo.p_damper_pivot)
-    rocker.list_points()
-
-    system = MultiBodySystem([front_triangle, rear_triangle, rocker, lower_link, damper])
-
-    system.list_bodies()
-
-    ax = plt.axes()
-    system.set_states(system.get_states())
-    ax.axis('equal')
-    system.plot(ax)
-
-    plt.savefig('temp.png')
-
-    # Check constraint functionality
-    system.connect_points(damper.points['rocker'], rocker.points['damper'])
-    system.connect_points(damper.points['front_triangle'], front_triangle.points['damper'])
-    system.connect_points(rocker.points['front_triangle'], front_triangle.points['rocker'])
-    system.connect_points(rocker.points['rear_triangle'], rear_triangle.points['rocker'])
-    system.connect_points(lower_link.points['rear_triangle'], rear_triangle.points['lower_link'])
-    system.connect_points(lower_link.points['front_triangle'], front_triangle.points['lower_link'])
-    system.fix_point(front_triangle.points['bottom_bracket'], np.zeros(2))
-    system.fix_orientation(front_triangle, 0.)
-
-    system.set_states(system.get_states())
-    print(system.evaluate_constraints())
-
-    system.check_system_dof()
-
-    # Test save and load
-    new_front_triangle = RigidBody2D.from_dict(front_triangle.to_dict())
-    new_front_triangle.list_points()
-    front_triangle.list_points()
-
-    new_system = MultiBodySystem.from_dict(system.to_dict())
-    new_system.plot(ax)
-    plt.savefig('temp.png')
-
-    print(system.to_dict())
-    system.check_system_dof()
-
-    system = MultiBodySystem.from_dict(json.loads(json.dumps(system.to_dict(), cls=NumpyEncoder)))
-    system.check_system_dof()
-
-    system.save(os.path.join(os.getcwd(), 'geometries/5010.json'))
-
-
-if __name__ == "__main__":
-    main()
-

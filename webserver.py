@@ -11,8 +11,7 @@ def simulate_and_plot(damper_stroke):
     damper_travel = np.linspace(0, damper_stroke, n_point)
     l_damper = damper_eye2eye - damper_travel
 
-    x_rear_axle, z_rear_axle = simulate_damper_sweep(l_damper=l_damper)
-
+    x_rear_axle, z_rear_axle = simulate_damper_sweep(l_damper=l_damper, system_file='geometries/5010.json')
 
     plt.plot(damper_travel, z_rear_axle, '-*')
     plt.xlabel('damper travel [m]')
