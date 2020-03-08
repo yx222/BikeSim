@@ -137,8 +137,7 @@ class MultiBodySystem:
         """
         Plot all bodies in the system
         """
-        for name, body in self.bodies.items():
-            body.plot(ax)
+        return [body.plot(ax) for body in self.bodies.values()]
 
     def list_bodies(self):
         for b in self.bodies.values():
@@ -216,7 +215,7 @@ class RigidBody2D:
         xy = np.array([p.get_position() for p in self.points.values()])
         xy = np.vstack((xy, xy[0]))
 
-        ax.plot(xy[:, 0], xy[:, 1],  linewidth=6)
+        return ax.plot(xy[:, 0], xy[:, 1],  linewidth=6)
 
     def __repr__(self):
         return f'RigidBody2D {self.name} at {self.pose}'
