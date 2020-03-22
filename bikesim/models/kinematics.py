@@ -5,7 +5,7 @@ import logging
 
 from bikesim.models.multibody import MultiBodySystem
 
-logging.getLogger().setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class NonlinearProblem():
@@ -42,7 +42,8 @@ class Kinematics(NonlinearProblem):
         #
         # The callback for calculating the objective
         #
-        # We want a constant, but a constant will throw warning (output independent of input)
+        # We want a constant, but a constant will throw warning
+        # (output independent of input)
         return np.sum(x)*0
 
     def constraints(self, x):
@@ -55,11 +56,11 @@ class Kinematics(NonlinearProblem):
         return np.zeros(self.n_dec)
 
     def set_bounds(self, **kwargs):
-        self.lb = -np.ones(self.n_dec)
-        self.ub = np.ones(self.n_dec)
+        self.lb = -np.ones(self.n_dec)*np.pi
+        self.ub = 2*np.ones(self.n_dec)
 
-        # WHY? constrain x position of rear axle and lower link pivot on rear triangle
-        # to be -ve
+        # WHY? constrain x position of rear axle and lower link pivot on
+        # rear triangle to be -ve
         # self.ub[self.idx['ax']] = 0
         # self.ub[self.idx['bx']] = 0
 
@@ -76,9 +77,10 @@ class Kinematics(NonlinearProblem):
         self.cl = np.zeros(self.n_con)
         self.cu = np.zeros(self.n_con)
 
-    def construct_nlp(self, l_damper):
+    def construct_nlp(self, l_fork, l_damper):
 
         self.system.constraints['damper_length'].distance = l_damper
+        self.system.constraints['fork_shaft_length'].distance = l_fork
         self.set_bounds()
         self.set_cons()
 
@@ -95,8 +97,12 @@ class Kinematics(NonlinearProblem):
         # Set solver options
         #nlp.addOption('derivative_test', 'second-order')
         nlp.addOption('mu_strategy', 'adaptive')
-        nlp.addOption('tol', 1e-7)
-        nlp.addOption('print_level', 0)
+        nlp.addOption('tol', 1e-4)
+        if logging.getLogger().getEffectiveLevel() == logging.DEBUG:
+            print_level = 5
+        else:
+            print_level = 0
+        nlp.addOption('print_level', print_level)
 
         # Scale the problem (Just for demonstration purposes)
         #
@@ -106,3 +112,28 @@ class Kinematics(NonlinearProblem):
         )
         nlp.addOption('nlp_scaling_method', 'user-scaling')
         return nlp
+
+
+class BikeKinematics(Kinematics):
+    """
+    Store and manipulate MTB kinematics problems.
+
+    Free variables managed are:
+    - design varibles:
+        - key geometry data, such as BB position, headtube angle, etc
+        - component, such as the damper eye-to-eye, damper travel, etc
+    - state variables: 
+        - current sag of fork and damper
+        - potentially tyre deformation as well?
+
+    We should be able to easily:
+    - for a fixed design variable (given a bike), solve for current state.
+        eg, what's the motion ratio for a range of sag sweep
+    - for a fixed state, optimize some criteria to decide on design
+        eg, what length should my lower link be if I want to maximize
+        anti-squat, while keeping the motion ratio constant at 30% sag?
+
+    """
+
+    def __init__(self):
+        pass

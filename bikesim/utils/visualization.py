@@ -1,3 +1,4 @@
+import logging
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from typing import Optional
@@ -7,15 +8,21 @@ if sys_pf == 'darwin':
     import matplotlib
     matplotlib.use("TkAgg")
 
+logger = logging.getLogger(__name__)
+
 
 def create_kinematic_animation(system, solutions, file_name):
     fig = plt.figure(figsize=(12, 8))
     ax = plt.axes()
+    ax.axis('equal')
     num_frame = len(solutions)
 
     def animate(i):
         system.set_states(solutions[i])
         ax.clear()
+        ax.axis('equal')
+        ax.set_xlim([-1, 1.5])
+        ax.set_ylim([-0.5, 1.5])
         return system.plot(ax)
 
     t_total = 3

@@ -4,6 +4,7 @@ import os
 import numpy as np
 from parameterized import parameterized
 from bikesim.simulation.suspension_simulation import simulate_damper_sweep
+from bikesim.models.multibody import MultiBodySystem
 
 logging.getLogger().setLevel(logging.WARN)
 
@@ -24,8 +25,8 @@ class TestKinematics(unittest.TestCase):
         system_file = os.path.join(self.geometry_dir, file_name)
         logging.info(f'simulating {name} geometry from: {system_file}')
         x, z = simulate_damper_sweep(
-            l_damper=0.21 - np.linspace(0, 0.05, 21),
-            system_file=system_file)
+            sag=np.linspace(0, 1, 21),
+            system=MultiBodySystem.from_json(system_file))
 
 
 if __name__ == '__main__':

@@ -2,12 +2,12 @@ import unittest
 import logging
 import os
 import tempfile
-import json
 import filecmp
 from parameterized import parameterized
 from bikesim.models.multibody import MultiBodySystem
 
-logging.getLogger().setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 class TestSystem(unittest.TestCase):

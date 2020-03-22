@@ -4,27 +4,33 @@ from bikesim.models.multibody import MultiBodySystem
 from bikesim.utils.visualization import create_kinematic_animation
 import numpy as np
 
+logger = logging.getLogger(__name__)
 
-def simulate_damper_sweep(l_damper=0.21, system_file='geometries/5010.json',
+
+def simulate_damper_sweep(sag, system: MultiBodySystem,
                           create_animation: bool = False):
     """
     Sweep the eye-to-eye damper length and solve for geometry.
     """
-    system = MultiBodySystem.from_json(system_file)
+    # TODO: figure out where these data should go.
+    # They should probably be bike design parameters
+    damper_eye_to_eye = 0.21
+    damper_travel = 0.05
+    fork_travel = 0.13
+
+    l_damper = damper_eye_to_eye - damper_travel*sag
+    l_fork = fork_travel * (1-sag)
+
     bike_kinematics = Kinematics(system=system)
 
     # Solve the problem
     x = bike_kinematics.get_init_guess()
-
-    # sweep through damper length, make it iterable if it's scalar
-    if np.isscalar(l_damper):
-        l_damper = [l_damper]
-
-    x_array = np.zeros((len(l_damper), bike_kinematics.n_dec))
+    x_array = np.zeros((len(sag), bike_kinematics.n_dec))
 
     rear_axle_position_list = []
-    for ii, l in enumerate(l_damper):
-        nlp = bike_kinematics.construct_nlp(l_damper=l)
+    for ii in range(len(l_damper)):
+        nlp = bike_kinematics.construct_nlp(
+            l_fork=l_fork[ii], l_damper=l_damper[ii])
         x, info = nlp.solve(x)
         x_array[ii] = x
 
@@ -40,7 +46,3 @@ def simulate_damper_sweep(l_damper=0.21, system_file='geometries/5010.json',
     xz = np.vstack(rear_axle_position_list)
 
     return xz[:, 0], xz[:, 1]
-
-
-if __name__ == "__main__":
-    simulate_damper_sweep(l_damper=0.21)

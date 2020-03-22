@@ -1,115 +1,222 @@
 {
     "bodies": {
         "front_triangle": {
-            "name": "front_triangle",
-            "pose": [
-                0.0,
-                0.0,
-                0.0
-            ],
-            "points": {
-                "bottom_bracket": {
-                    "rel_position": [
-                        0.0,
-                        0.0
-                    ]
-                },
-                "rocker": {
-                    "rel_position": [
-                        -0.03,
-                        0.3188
-                    ]
-                },
-                "damper": {
-                    "rel_position": [
-                        0.2079,
-                        0.3904
-                    ]
-                },
-                "lower_link": {
-                    "rel_position": [
-                        0.0462,
-                        0.0462
-                    ]
+            "type": "RigidBody2D",
+            "data": {
+                "name": "front_triangle",
+                "pose": [
+                    3.935118556602161e-29,
+                    0.30732256914415285,
+                    -0.06233663465717505
+                ],
+                "points": {
+                    "lower_link": {
+                        "rel_position": [
+                            0.0462,
+                            0.0462
+                        ]
+                    },
+                    "bottom_bracket": {
+                        "rel_position": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "rocker": {
+                        "rel_position": [
+                            -0.03,
+                            0.3188
+                        ]
+                    },
+                    "damper": {
+                        "rel_position": [
+                            0.2079,
+                            0.3904
+                        ]
+                    },
+                    "head_tube_upper": {
+                        "rel_position": [
+                            0.46164,
+                            0.5682
+                        ]
+                    },
+                    "head_tube_lower": {
+                        "rel_position": [
+                            0.4805,
+                            0.5313
+                        ]
+                    }
                 }
             }
         },
         "rear_triangle": {
-            "name": "rear_triangle",
-            "pose": [
-                -0.4229889750112173,
-                0.015607108840916676,
-                0.0
-            ],
-            "points": {
-                "rear_axle": {
-                    "rel_position": [
-                        0.0,
-                        0.0
-                    ]
-                },
-                "rocker": {
-                    "rel_position": [
-                        0.43851431300872373,
-                        0.22811770496090877
-                    ]
-                },
-                "lower_link": {
-                    "rel_position": [
-                        0.37877285978116154,
-                        -0.004534393165927105
-                    ]
+            "type": "RigidBody2D",
+            "data": {
+                "name": "rear_triangle",
+                "pose": [
+                    -0.4211951396053283,
+                    0.34925,
+                    -0.06233663463746105
+                ],
+                "points": {
+                    "rear_axle": {
+                        "rel_position": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "rocker": {
+                        "rel_position": [
+                            0.43851431300872373,
+                            0.22811770496090877
+                        ]
+                    },
+                    "lower_link": {
+                        "rel_position": [
+                            0.37877285978116154,
+                            -0.004534393165927105
+                        ]
+                    }
                 }
             }
         },
         "rocker": {
-            "name": "rocker",
-            "pose": [
-                -0.03,
-                0.3188,
-                0.0
-            ],
-            "points": {
-                "front_triangle": {
-                    "rel_position": [
-                        0.0,
-                        0.0
-                    ]
-                },
-                "rear_triangle": {
-                    "rel_position": [
-                        0.04552533799750643,
-                        -0.07507518619817452
-                    ]
-                },
-                "damper": {
-                    "rel_position": [
-                        0.0737617723087218,
-                        -0.05939100042145201
-                    ]
+            "type": "RigidBody2D",
+            "data": {
+                "name": "rocker",
+                "pose": [
+                    -0.010081679961241123,
+                    0.6273722526139354,
+                    -0.06233663471979071
+                ],
+                "points": {
+                    "front_triangle": {
+                        "rel_position": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "rear_triangle": {
+                        "rel_position": [
+                            0.04552533799750643,
+                            -0.07507518619817452
+                        ]
+                    },
+                    "damper": {
+                        "rel_position": [
+                            0.0737617723087218,
+                            -0.05939100042145201
+                        ]
+                    }
                 }
             }
         },
         "lower_link": {
-            "name": "lower_link",
-            "pose": [
-                0.0462,
-                0.0462,
-                0.0
-            ],
-            "points": {
-                "front_triangle": {
-                    "rel_position": [
-                        0.0,
-                        0.0
-                    ]
-                },
-                "rear_triangle": {
-                    "rel_position": [
-                        -0.09041611523005574,
-                        -0.03512728432501043
-                    ]
+            "type": "RigidBody2D",
+            "data": {
+                "name": "lower_link",
+                "pose": [
+                    0.04898835353101546,
+                    0.3505547472639233,
+                    -0.0623366346193106
+                ],
+                "points": {
+                    "front_triangle": {
+                        "rel_position": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "rear_triangle": {
+                        "rel_position": [
+                            -0.09041611523005574,
+                            -0.03512728432501043
+                        ]
+                    }
                 }
+            }
+        },
+        "rear_wheel": {
+            "type": "Circle2D",
+            "data": {
+                "name": "rear_wheel",
+                "pose": [
+                    -0.4211951396053283,
+                    0.34925,
+                    7.147101415571663e-36
+                ],
+                "points": {
+                    "rear_axle": {
+                        "rel_position": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "rear_contact_patch": {
+                        "rel_position": [
+                            0,
+                            -0.34925
+                        ]
+                    }
+                },
+                "radius": 0.34925
+            }
+        },
+        "fork_lower_leg": {
+            "type": "RigidBody2D",
+            "data": {
+                "name": "fork_lower_leg",
+                "pose": [
+                    0.7599697798711451,
+                    0.34925,
+                    -1.160636025935007
+                ],
+                "points": {
+                    "front_axle": {
+                        "rel_position": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "lower": {
+                        "rel_position": [
+                            0.0,
+                            -0.044
+                        ]
+                    },
+                    "upper": {
+                        "rel_position": [
+                            -0.389,
+                            -0.044
+                        ]
+                    }
+                }
+            }
+        },
+        "front_wheel": {
+            "type": "Circle2D",
+            "data": {
+                "name": "front_wheel",
+                "pose": [
+                    0.7599697798711451,
+                    0.34925,
+                    7.147101415568926e-36
+                ],
+                "points": {
+                    "front_axle": {
+                        "rel_position": [
+                            0.0,
+                            0.0
+                        ]
+                    },
+                    "front_contact_patch": {
+                        "rel_position": [
+                            0,
+                            -0.34925
+                        ]
+                    }
+                },
+                "radius": 0.34925
             }
         }
     },
@@ -179,28 +286,6 @@
             }
         },
         {
-            "type": "FixedPoint",
-            "data": {
-                "name": "FixedPoint.front_triangle.bottom_bracket",
-                "point_name": [
-                    "front_triangle",
-                    "bottom_bracket"
-                ],
-                "position": [
-                    0.0,
-                    0.0
-                ]
-            }
-        },
-        {
-            "type": "FixedOrientation",
-            "data": {
-                "name": "FixedOrientation.front_triangle",
-                "body_name": "front_triangle",
-                "orientation": 0.0
-            }
-        },
-        {
             "type": "FixedDistance",
             "data": {
                 "name": "damper_length",
@@ -215,6 +300,146 @@
                     ]
                 ],
                 "distance": 0.21
+            }
+        },
+        {
+            "type": "Coincident",
+            "data": {
+                "name": "Coincident.rear_wheel.rear_axle.rear_triangle.rear_axle",
+                "point_names": [
+                    [
+                        "rear_wheel",
+                        "rear_axle"
+                    ],
+                    [
+                        "rear_triangle",
+                        "rear_axle"
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "FixedOrientation",
+            "data": {
+                "name": "FixedOrientation.rear_wheel",
+                "body_name": "rear_wheel",
+                "orientation": 0
+            }
+        },
+        {
+            "type": "SlidingPoint",
+            "data": {
+                "name": "SlidingPoint.upper.on.head_tube_upper.and.head_tube_upper",
+                "point_name": [
+                    "fork_lower_leg",
+                    "upper"
+                ],
+                "rail_point_names": [
+                    [
+                        "front_triangle",
+                        "head_tube_upper"
+                    ],
+                    [
+                        "front_triangle",
+                        "head_tube_lower"
+                    ]
+                ],
+                "offset": 0
+            }
+        },
+        {
+            "type": "SlidingPoint",
+            "data": {
+                "name": "SlidingPoint.lower.on.head_tube_upper.and.head_tube_upper",
+                "point_name": [
+                    "fork_lower_leg",
+                    "lower"
+                ],
+                "rail_point_names": [
+                    [
+                        "front_triangle",
+                        "head_tube_upper"
+                    ],
+                    [
+                        "front_triangle",
+                        "head_tube_lower"
+                    ]
+                ],
+                "offset": 0
+            }
+        },
+        {
+            "type": "Coincident",
+            "data": {
+                "name": "Coincident.front_wheel.front_axle.fork_lower_leg.front_axle",
+                "point_names": [
+                    [
+                        "front_wheel",
+                        "front_axle"
+                    ],
+                    [
+                        "fork_lower_leg",
+                        "front_axle"
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "FixedDistance",
+            "data": {
+                "name": "fork_shaft_length",
+                "point_names": [
+                    [
+                        "front_triangle",
+                        "head_tube_lower"
+                    ],
+                    [
+                        "fork_lower_leg",
+                        "upper"
+                    ]
+                ],
+                "distance": 0.13
+            }
+        },
+        {
+            "type": "FixedHeight",
+            "data": {
+                "name": "FixedHeight.front_wheel.front_contact_patch",
+                "point_name": [
+                    "front_wheel",
+                    "front_contact_patch"
+                ],
+                "height": 0
+            }
+        },
+        {
+            "type": "FixedOrientation",
+            "data": {
+                "name": "FixedOrientation.front_wheel",
+                "body_name": "front_wheel",
+                "orientation": 0
+            }
+        },
+        {
+            "type": "FixedHeight",
+            "data": {
+                "name": "FixedHeight.rear_wheel.rear_contact_patch",
+                "point_name": [
+                    "rear_wheel",
+                    "rear_contact_patch"
+                ],
+                "height": 0
+            }
+        },
+        {
+            "type": "FixedX",
+            "data": {
+                "name": "FixedX.front_triangle.bottom_bracket",
+                "point_name": [
+                    "front_triangle",
+                    "bottom_bracket"
+                ],
+                "x": 0
             }
         }
     ]
