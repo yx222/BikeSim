@@ -37,7 +37,7 @@ class TestVisualization(unittest.TestCase):
     def test_animation(self, name, file_name):
         system_file = os.path.join(self.geometry_dir, file_name)
         logging.info(f'simulating {name} geometry from: {system_file}')
-        x, z = simulate_damper_sweep(
+        wheel_travel = simulate_damper_sweep(
             sag=np.linspace(0, 1, 51),
             system=MultiBodySystem.from_json(system_file),
             create_animation=True)
