@@ -1,12 +1,13 @@
 From continuumio/miniconda3
 
-RUN conda install -c conda-forge cyipopt
-RUN conda install jupyter
+RUN apt-get update \
+    && apt-get install -y vim
 
-RUN pip install autograd
-RUN pip install parameterized
-RUN conda install matplotlib
-RUN conda install -c conda-forge ffmpeg
+RUN conda install -c conda-forge cyipopt ffmpeg \
+    && conda install jupyter matplotlib \
+    && pip install autograd parameterized nose pylint autopep8
 
 WORKDIR /BikeSim
+ENV PYTHONPATH "${PYTHONPATH}:/BikeSim/bikesim"
+
 CMD python3 webserver.py
