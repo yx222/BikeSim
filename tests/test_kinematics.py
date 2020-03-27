@@ -10,9 +10,10 @@ from bikesim.models.kinematics import BikeKinematics
 logger = logging.getLogger(__name__)
 
 
-class TestKinematicSimulation(unittest.TestCase):
+class TestBikeKinematics(unittest.TestCase):
     """
-    Test simulations we run for kinematics
+    Test a bunch of different arrangements of kinematics.
+    eg: VPP high pivot, low pivot, horst link, etc
     """
 
     def setUp(self):
@@ -21,12 +22,18 @@ class TestKinematicSimulation(unittest.TestCase):
     @parameterized.expand([
         ["VPP_High", '5010_bike.json']
     ])
-    def test_damper_sweep(self, name, file_name):
+    def test_load_from_json(self, name, file_name):
         bike_file = os.path.join(self.geometry_dir, file_name)
         my_bike = BikeKinematics.from_json(bike_file)
 
-        sag_array = np.linspace(0, 1, 21)
-        rel_wheel_travel = simulate_damper_sweep(sag_array, bike=my_bike)
+    @parameterized.expand([
+        ["VPP_High", '5010_bike.json']
+    ])
+    def test_sag_solve(self, name, file_name):
+        bike_file = os.path.join(self.geometry_dir, file_name)
+        my_bike = BikeKinematics.from_json(bike_file)
+
+        x, info = my_bike.solve(sag_front=0.3, sag_rear=0.3)
 
 
 if __name__ == '__main__':

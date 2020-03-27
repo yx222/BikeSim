@@ -7,6 +7,7 @@ from parameterized import parameterized
 
 from bikesim.simulation.suspension_simulation import simulate_damper_sweep
 from bikesim.models.multibody import MultiBodySystem
+from bikesim.models.kinematics import BikeKinematics
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +33,14 @@ class TestVisualization(unittest.TestCase):
         fig.savefig('5010_geometry.png')
 
     @parameterized.expand([
-        ["VPP_High", '5010.json']
+        ["VPP_High", '5010_bike.json']
     ])
     def test_animation(self, name, file_name):
-        system_file = os.path.join(self.geometry_dir, file_name)
-        logging.info(f'simulating {name} geometry from: {system_file}')
+        bike_file = os.path.join(self.geometry_dir, file_name)
+        logging.info(f'simulating {name} geometry from: {bike_file}')
         wheel_travel = simulate_damper_sweep(
-            sag=np.linspace(0, 1, 51),
-            system=MultiBodySystem.from_json(system_file),
+            sag_array=np.linspace(0, 1, 51),
+            bike=BikeKinematics.from_json(bike_file),
             create_animation=True)
 
 
