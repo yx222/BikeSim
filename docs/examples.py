@@ -1,5 +1,5 @@
 # Examples showing how users should use the code. For deisgn guidance
-
+# NOT WORKING EXAMPLES!
 
 # Create a bike object
 sc_5010 = BikeKinematics.from_json('some_json_file')

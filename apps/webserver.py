@@ -34,7 +34,7 @@ def simulate_and_plot(damper_travel):
 
 @app.route('/')
 def index():
-    return static_file('index.html', root="./")
+    return static_file('html/index.html', root="./")
 
 
 @app.route('/plot.svg')
