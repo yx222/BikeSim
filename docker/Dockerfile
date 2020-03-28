@@ -5,9 +5,9 @@ RUN apt-get update \
 
 RUN conda install -c conda-forge cyipopt ffmpeg \
     && conda install jupyter matplotlib \
-    && pip install autograd parameterized nose pylint autopep8
+    && pip install autograd parameterized nose pylint autopep8 bottle webtest
 
 WORKDIR /BikeSim
 ENV PYTHONPATH "${PYTHONPATH}:/BikeSim/bikesim"
 
-CMD python3 webserver.py
+CMD apps/webserver.py

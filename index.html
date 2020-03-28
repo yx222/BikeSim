@@ -1,35 +1,38 @@
 <html>
+
 <head>
-<title>Kinematic Simulation</title>
-<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
-<script type="text/javascript">
-jQuery(document).ready(function(){
-    $('#plot').click(function() {
-        p = $('#damper_stroke').val();
-        $('#graph').attr("src","https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/0.16.1/images/loader-large.gif");
+  <title>Kinematic Simulation</title>
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
+  <script type="text/javascript">
+    jQuery(document).ready(function () {
+      $('#plot').click(function () {
+        p = $('#damper_travel').val();
+        $('#graph').attr("src", "https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/0.16.1/images/loader-large.gif");
 
         $.ajax({
-          url: "plot.svg?damper_stroke=" + p,
+          url: "plot.svg?damper_travel=" + p,
           dataType: 'text',
-          success: function(response) {
-            $('#graph').attr("src","data:image/svg+xml;utf8," + response);
+          success: function (response) {
+            $('#graph').attr("src", "data:image/svg+xml;utf8," + response);
           },
-          error: function(response) {
+          error: function (response) {
             alert("Failed to get svg data");
           }
         });
+      });
     });
-});
 
-</script>
+  </script>
 </head>
+
 <body>
 
-DamplerStroke:
-<input id='damper_stroke' value="0.05"/>
-<input id='plot' type="button" value="Plot" />
-<p>
-<image id='graph' />
+  DamperTravel:
+  <input id='damper_travel' value="0.05" />
+  <input id='plot' type="button" value="Plot" />
+  <p>
+    <image id='graph' />
 
 </body>
+
 </html>

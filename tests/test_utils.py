@@ -39,7 +39,7 @@ class TestVisualization(unittest.TestCase):
         bike_file = os.path.join(self.geometry_dir, file_name)
         logging.info(f'simulating {name} geometry from: {bike_file}')
         wheel_travel = simulate_damper_sweep(
-            sag_array=np.linspace(0, 1, 51),
+            sag_array=np.linspace(0, 1, 21),
             bike=BikeKinematics.from_json(bike_file),
             create_animation=True)
 
